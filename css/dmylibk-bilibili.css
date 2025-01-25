@@ -1,0 +1,114 @@
+.dmylibk-tencent,
+.dmylibk-default,
+.dmylibk-csdn,
+.dmylibk-zhihu {
+  display: none;
+}
+
+.dmy-overall-body,
+.dmy-overall-html {
+  background: #F3F4F5;
+  font-family: PingFang SC, Hiragino Sans GB, Arial, Microsoft YaHei, Verdana, Roboto, Noto, Helvetica Neue, sans-serif;
+}
+
+.dmylibk-bilibili {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: absolute;
+  bottom: 0;
+  top: -220px;
+  left: 0;
+  right: 0;
+}
+
+.dmylibk-bilibili-title {
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  width: 607px;
+  min-height: 362px;
+  background: #fff;
+  /* border-radius: 8px; */
+  padding: 20px 60px 0px 60px;
+  background-image: url(../assets/img/dmylink-bilibili-22.png), url(../assets/img/dmylink-bilibili-33.png);
+  background-position: 0px 100%, 100% 100%;
+  background-repeat: no-repeat, no-repeat;
+  background-size: 18%;
+  position: relative;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  box-shadow: 0 8px 12px rgba(55, 79, 120, .08);
+  border-radius: 20px;
+}
+
+
+
+.dmylibk-bilibili-title img {
+  width: 150px;
+}
+
+.dmylibk-bilibili-title-span {
+  margin-bottom: 20px;
+  font-weight: 600;
+  font-size: 19px;
+}
+
+.dmylibk-bilibili-title-link {
+  padding: 0px 35px 0 35px;
+}
+
+.dmylibk-bilibili-title-logo {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.dmylibk-bilibili-title-div {
+  padding: 5px;
+  margin-bottom: 16px;
+  border-radius: 30px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  box-shadow: 0px 0px 8px 1px rgba(255, 112, 173, 0.35);
+}
+
+.dmylibk-bilibili-title-div img {
+  width: 30px;
+  margin: 0px 5px 0px;
+}
+
+.dmylibk-bilibili-title-span-no2 {
+  font-size: large;
+  color: #0693e3;
+}
+
+.dmylibk-tencent-link-a {
+  display: flex;
+  justify-content: center;
+
+}
+
+.dmylibk-tencent-link-a a {
+  display: flex;
+  border-radius: 8px;
+  background: #fb7299;
+  min-width: 140px;
+  height: 49px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  /* font-weight: 400; */
+  color: #fff;
+  margin: 9px 18px 2px;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.dmylibk-tencent-link-a a:hover {
+  background: #ff85b2;
+}
