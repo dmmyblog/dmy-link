@@ -18,8 +18,8 @@
    - **哔哩哔哩风格**  
    - **腾讯风格**  
    - **CSDN风格**  
-   - **知乎风格**![2](https://github.com/user-attachments/assets/cc6468f0-8144-410a-b54d-494cf260526f)
-
+   - **知乎风格**
+![2](https://github.com/user-attachments/assets/cc6468f0-8144-410a-b54d-494cf260526f)
 4. **Logo自定义**  
    用户可以上传自己的 Logo 图片，替换插件默认的 Logo。没有设置 Logo 时，插件不会默认使用网站的 Logo。
    ![3](https://github.com/user-attachments/assets/2e3088ef-2dff-47d9-a951-66f21adee85c)
