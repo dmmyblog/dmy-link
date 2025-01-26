@@ -2,7 +2,7 @@
 /*
 Plugin Name: 大绵羊外链跳转插件
 Description: 大绵羊外链跳转插件是一个非常实用的WordPress插件，它可以对文章中的外链进行过滤，有效地防止追踪和提醒用户。
-Version: 1.1.0
+Version: 1.1.1
 Author: 大绵羊
 Author URI: https://dmyblog.cn
 */
