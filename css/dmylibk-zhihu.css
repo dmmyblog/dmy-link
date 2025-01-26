@@ -14,33 +14,59 @@
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 }
 
-.dmylibk-zhihu {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: absolute;
-  bottom: 0;
-  top: -400px;
-  left: 0;
-  right: 0;
+.dmylibk-zhihu-box {
+  padding-top: 220px;
+  max-width: 540px;
+  margin: auto;
+  word-break: break-all;
+}
+
+@media (max-width: 450px) {
+  .dmylibk-zhihu-box {
+    padding-top: 120px;
+    width: 94%;
+  }
 }
 
 .dmylibk-zhihu-title {
+  position: relative;
+  z-index: 9997;
   background-color: #f7f7f7;
   border: 1px solid #babbbc;
   border-radius: 5px;
-  width: 540px;
-  padding: 25px 30px 30px 25px;
+  padding: 26px;
 }
 
-h1 {
+.dmylibk-zhihu-title-icon p {
+  font-size: 15px;
+}
+
+.dmylibk-zhihu-title-text {
+  font-size: 18px;
+  color: #222226;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin-bottom: 12px;
   font-size: 16px;
   font-weight: 700;
   line-height: 1;
 }
 
-.dmylibk-zhihu-title-div {
+.dmylibk-zhihu-titlelink {
+  font-size: 14px;
+  color: #222226;
+  line-height: 24px;
+  margin-bottom: 24px;
+}
+
+
+
+.dmylibk-zhihu-titlelink a {
+  color: #FC5531;
+}
+
+.dmylibk-zhihu-titlelink-p-no2 {
   margin-top: 12px;
   word-wrap: normal;
   white-space: nowrap;
@@ -48,6 +74,7 @@ h1 {
   text-overflow: ellipsis;
   cursor: pointer;
 }
+
 
 .dmylibk-zhihu-link-a {
   margin-top: 15px;
@@ -67,15 +94,9 @@ h1 {
   text-decoration: none;
 }
 
-.dmylibk-zhihu-link-a a:hover {
-  background-color: #0089e6;
-}
-
-.dmylibk-zhihu-img {
-  margin-bottom: 10px;
-}
-
-.dmylibk-zhihu-img img {
-  width: 250px;
-  margin-left: 30px;
+.dmylibk-zhihu-logo img {
+  display: block;
+  width: 200px;
+  margin-right: auto;
+  margin-bottom: 16px;
 }
