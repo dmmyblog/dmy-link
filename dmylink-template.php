@@ -56,8 +56,9 @@
             <div class="dmylibk-bilibili-title">
                 <div class="dmylibk-bilibili-title-div-title-no2">
                     <div class="dmylibk-bilibili-title-icon"> <img class="loading-img"
-                            src="https://batimg.com/0qKXXe.png" alt="">
-                        <div class="dmylibk-bilibili-title-text">即将离开 大绵羊测试，请保护好个人信息
+                            src="<?php echo plugins_url('assets\img\dmylibk-bilibili.png', __FILE__); ?>" alt="">
+                        <div class="dmylibk-bilibili-title-text">即将离开
+                            <?php echo get_bloginfo('name'); ?>，请保护好个人信息
                         </div>
                     </div>
 
@@ -67,12 +68,14 @@
                             <img class="loading-img"
                                 src="<?php echo plugins_url('assets\img\dmylink-bilibili-link.png', __FILE__); ?>"
                                 alt="<?php echo get_bloginfo('name'); ?>-提示警告">
-                            <span>https://www.aliyun.com/</span>
+                            <span>
+                                <?php echo esc_url($link); ?>
+                            </span>
                         </div>
                     </div>
                     <div class="dmylibk-bilibili-link-a">
-                        <a class="dmylibk-bilibili-link-a-no1" href="http://localhost">返回首页</a>
-                        <a class="dmylibk-bilibili-link-a-no2" href="https://dmyblog.cn/">继续访问</a>
+                        <a class="dmylibk-bilibili-link-a-no1" href="<?php echo home_url(); ?>">返回首页</a>
+                        <a class="dmylibk-bilibili-link-a-no2" href="<?php echo esc_url($link); ?>">继续访问</a>
                     </div>
                 </div>
 
