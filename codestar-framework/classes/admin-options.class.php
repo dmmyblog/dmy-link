@@ -59,7 +59,7 @@ if ( ! class_exists( 'CSF_Options' ) ) {
       'admin_bar_menu_priority' => 50,
 
       // footer
-      'footer_text'             => '作者：大绵羊 | 作者网站<a href="https://dmyblog.cn">大绵羊博客</a> | 版本:V1.1.1 | <i class="fa fa-fw fa-heart-o" aria-hidden="true"></i> 感谢您使用大绵羊外链跳转插件。',
+      'footer_text'             => '作者：大绵羊 | 作者网站<a href="https://dmyblog.cn">大绵羊博客</a> | 版本:V1.2.0 | <i class="fa fa-fw fa-heart-o" aria-hidden="true"></i> 感谢您使用大绵羊外链跳转插件。',
       'footer_after'            => '',
       'footer_credit'           => '',
 

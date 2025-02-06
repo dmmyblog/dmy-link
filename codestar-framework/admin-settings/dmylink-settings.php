@@ -50,7 +50,26 @@ if( class_exists( 'CSF' ) ) {
             ),
         ),
     ));
-      CSF::createSection($prefix, array(
+
+    // 添加过期时间设置
+    CSF::createSection($prefix, array(
+        'title'  => '过期时间设置',
+        'icon' => 'fa fa-clock-o',
+        'fields' => array(
+            array(
+                'id'    => 'dmy_link_expiration',
+                'type'  => 'number',
+                'title' => '过期时间（分钟）',
+                'desc'  => '设置外链跳转链接的过期时间，单位为分钟<br/>默认为5分钟',
+                
+                'default' => 5, // 默认过期时间为5分钟
+                'min' => 1,
+                'max' => 1440,
+            ),
+        ),
+    ));
+
+    CSF::createSection($prefix, array(
         'title'  => 'Logo 设置',
         'icon' => 'fa fa-image',
         'fields' => array(
