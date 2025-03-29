@@ -2,13 +2,19 @@
 /*
 Plugin Name: 大绵羊外链跳转插件
 Description: 大绵羊外链跳转插件是一个非常实用的WordPress插件，它可以对文章中的外链进行过滤，有效地防止追踪和提醒用户。
-Version: 1.2.0
+Version: 1.2.1
 Author: 大绵羊
 Author URI: https://dmyblog.cn
 */
 
 // 引入 Codestar Framework 进行插件设置
-require_once plugin_dir_path(__FILE__) . 'codestar-framework/codestar-framework.php';
+$current_theme = wp_get_theme();
+// 动态加载Codestar框架
+if ($current_theme && $current_theme->get('Name') === '子比主题') {
+    require_once plugin_dir_path(__FILE__) . 'inc/codestar-framework/codestar-framework.php';
+} else {
+    require_once plugin_dir_path(__FILE__) . 'codestar-framework/codestar-framework.php';
+}
 require_once plugin_dir_path(__FILE__) . 'codestar-framework/admin-settings/dmylink-settings.php';
 
 // 加载 CSS 样式
