@@ -2,7 +2,7 @@
 /*
 Plugin Name: 大绵羊外链跳转插件
 Description: 大绵羊外链跳转插件是一个非常实用的WordPress插件，它可以对文章中的外链进行过滤，有效地防止追踪和提醒用户。
-Version: 1.2.0
+Version: 1.3.0
 Author: 大绵羊
 Author URI: https://dmyblog.cn
 */
@@ -284,3 +284,21 @@ function dmy_link_uninstall() {
     }
 }
 register_uninstall_hook(__FILE__, 'dmy_link_uninstall');
+
+// 判断子比主题是否存在
+function is_zibll_themes() {
+    $file = '/wp-content/themes/zibll/style.css';
+    return file_exists($file);
+}
+
+//评论者链接重定向
+if (is_zibll_themes()){
+    remove_filter('get_comment_author_link', 'add_redirect_comment_link', 5);
+    remove_filter('comment_text', 'add_redirect_comment_link', 99);
+    add_filter('get_comment_author_link', 'dmy_add_redirect_comment_link', 5);
+    add_filter('comment_text', 'dmy_add_redirect_comment_link', 99);
+    function dmy_add_redirect_comment_link($text = '')
+    {
+        return dmy_link_intercept_links($text);
+    }
+}

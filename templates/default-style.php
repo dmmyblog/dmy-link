@@ -1,3 +1,10 @@
+<?php 
+if (is_zibll_themes()){
+    $logourl = esc_url($logo_url);
+} else {
+    $logourl = _pz('logo_src');
+}
+?>
 <!-- 默认风格 -->
 <div class="dmylink-default">
     <div class="dmylink-default-box">

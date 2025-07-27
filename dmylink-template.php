@@ -1,6 +1,6 @@
 <?php
 /**
- * 大绵羊外链跳转模板(优化版)
+ * 大绵羊外链跳转模板
  * 
  * 安全加载跳转页面模板，包含错误处理和缓存机制
  */
@@ -48,14 +48,14 @@ if (file_exists($css_file)) {
 }
 
 // 安全加载头部模板
-$header_file = plugin_dir_path(__FILE__) . 'templates/header.php';
-if (file_exists($header_file)) {
-    include_once $header_file;
-} else {
-    // 头部模板缺失的fallback
-    get_header();
-    echo '<div class="container">';
-}
+// $header_file = plugin_dir_path(__FILE__) . 'templates/header.php';
+// if (file_exists($header_file)) {
+//     include_once $header_file;
+// } else {
+//     // 头部模板缺失的fallback
+//     get_header();
+//     echo '<div class="container">';
+// }
 
 // 确定要加载的模板文件
 $template_file = isset(DMYLINK_TEMPLATES[$style]) ? 
@@ -82,7 +82,5 @@ if (file_exists($template_path)) {
 }
 
 // 加载页面底部
-wp_footer();
+//wp_footer();
 ?>
-</body>
-</html>
