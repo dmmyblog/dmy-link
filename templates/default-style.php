@@ -1,16 +1,9 @@
-<?php 
-if (is_zibll_themes()){
-    $logourl = esc_url($logo_url);
-} else {
-    $logourl = _pz('logo_src');
-}
-?>
 <!-- 默认风格 -->
 <div class="dmylink-default">
     <div class="dmylink-default-box">
         <!-- logo -->
         <div class="dmylink-default-logo">
-            <img src="<?php echo esc_url($logo_url); ?>" alt="<?php echo get_bloginfo('name'); ?>logo">
+            <img src="<?php echo $logourl; ?>" alt="<?php echo get_bloginfo('name'); ?>logo">
         </div>
         <!-- 内容 -->
         <div class="dmylink-default-title">

@@ -3,7 +3,7 @@
     <div class="dmylink-csdn-box">
         <!-- logo -->
         <div class="dmylink-csdn-logo">
-            <img src="<?php echo esc_url($logo_url); ?>" alt="<?php echo get_bloginfo('name'); ?>logo">
+            <img src="<?php echo $logourl; ?>" alt="<?php echo get_bloginfo('name'); ?>logo">
         </div>
         <!-- 内容 -->
         <div class="dmylink-csdn-title">

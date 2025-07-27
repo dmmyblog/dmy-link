@@ -1,7 +1,18 @@
 <?php
 // 引用 Codestar Framework
-require_once plugin_dir_path(__FILE__) . '../../codestar-framework/codestar-framework.php';
-
+// 判断子比主题是否存在
+function no_zibll_themes() {
+    // 构建 zibll 主题 style.css 的绝对路径
+    $style_file_path = WP_CONTENT_DIR . '/themes/zibll/style.css';
+    
+    // 检测文件是否存在且为文件（排除目录）
+    return file_exists($style_file_path) && is_file($style_file_path);
+}
+if (!no_zibll_themes()){
+    require_once plugin_dir_path(__FILE__) . '../../codestar-framework/codestar-framework.php';
+} else {
+    require_once get_template_directory() . '/inc/codestar-framework/codestar-framework.php';
+}
 // 引用设置页面文件
 // Control core classes for avoid errors
 if( class_exists( 'CSF' ) ) {
@@ -18,7 +29,20 @@ if( class_exists( 'CSF' ) ) {
         // 'footer_credit' => '柠萌主题Pro',
         // 'theme' => 'light'
     ) );
-
+    // 添加基本设置部分，包含总开关
+    CSF::createSection($prefix, array(
+        'title'  => '基本设置',
+        'icon' => 'fa fa-cog',
+        'fields' => array(
+            array(
+                'id'    => 'dmy_link_enable',
+                'type'  => 'switcher',
+                'title' => '启用插件功能',
+                'desc'  => '关闭后插件所有功能将停止工作',
+                'default' => true, // 默认开启
+            ),
+        ),
+    ));
     // 白名单设置
     CSF::createSection($prefix, array(
         'title'  => '白名单设置',
@@ -59,17 +83,23 @@ if( class_exists( 'CSF' ) ) {
         ),
     ));
 
-    // 7b2主题圈子功能设置
+    // 圈子/社区功能设置
     CSF::createSection($prefix, array(
-        'title'  => '7b2主题圈子功能',
+        'title'  => '主题社区功能',
         'icon' => 'fa fa-comments',
         'fields' => array(
             array(
-                'id'    => 'dmy_link_enable_circle',
-                'type'  => 'switcher',
-                'title' => '启用7b2主题圈子功能',
-                'desc'  => '启用后会自动为7b2主题的圈子页面中的外链添加跳转功能<br/>仅在使用7b2主题且需要圈子功能时开启',
-                'default' => false,
+                'id'    => 'dmy_link_function_type',
+                'type'  => 'radio',
+                'title' => '选择社区功能类型',
+                'desc'  => '选择您要启用的社区功能类型，只能选择一项',
+                'options' => array(
+                    'none' => '不启用任何社区功能',
+                    'circle' => '7b2主题圈子功能',
+                    'forums' => '子比主题社区帖子功能'
+                ),
+                'default' => 'none',
+                'inline' => true
             ),
             array(
                 'id'    => 'dmy_link_circle_selector',
@@ -77,7 +107,15 @@ if( class_exists( 'CSF' ) ) {
                 'title' => '圈子内容选择器',
                 'desc'  => '用于识别圈子内容的CSS选择器，默认为.topic-content<br/>如果您的主题结构不同，可以修改此选择器',
                 'default' => '.topic-content',
-                'dependency' => array('dmy_link_enable_circle', '==', true),
+                'dependency' => array('dmy_link_function_type', '==', 'circle'),
+            ),
+            array(
+                'id'    => 'dmy_link_forums_selector',
+                'type'  => 'text',
+                'title' => '社区帖子选择器',
+                'desc'  => '用于识别社区帖子内容的CSS选择器，默认为.forum-article<br/>如果您的主题结构不同，可以修改此选择器',
+                'default' => '.forum-article',
+                'dependency' => array('dmy_link_function_type', '==', 'forums'),
             ),
         ),
     ));
@@ -152,6 +190,11 @@ if( class_exists( 'CSF' ) ) {
                     'type' => 'notice',
                     'style' => 'info', 
                     'content' => '鸣谢(使用平台素材&或者样式)<br/> 1.哔哩哔哩<br/>2.腾讯云社区<br/>3.知乎<br/>4.CSDN<br/>'
+                ),
+                array(
+                    'type' => 'notice',
+                    'style' => 'info', 
+                    'content' => '鸣谢(共同开发)<br/>大绵羊的大哥：天无神话(<a href="https://wxsnote.cn">王先生笔记</a>)<br/>'
                 ),
                 array(
                     'type' => 'notice',

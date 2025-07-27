@@ -12,15 +12,27 @@ if (!defined('DMY_LINK_URL')) {
     define('DMY_LINK_URL', plugin_dir_url(__FILE__));
 }
 
+
 // 引入 Codestar Framework 进行插件设置
-require_once plugin_dir_path(__FILE__) . 'codestar-framework/codestar-framework.php';
+// 检查Codestar Framework是否已加载
+// if ( ! function_exists( 'cs_framework_init' ) ) {
+//     require_once plugin_dir_path(__FILE__) . 'codestar-framework/codestar-framework.php';
+// }
+
 require_once plugin_dir_path(__FILE__) . 'codestar-framework/admin-settings/dmylink-settings.php';
+// require_once plugin_dir_path(__FILE__) . 'codestar-framework/codestar-framework.php';
+// require_once plugin_dir_path(__FILE__) . 'codestar-framework/admin-settings/dmylink-settings.php';
 
 // 加载 CSS 样式
 function dmy_link_enqueue_styles() {
+    // 检查总开关状态
+    $settings = get_option('dmy_link_settings');
+    if (empty($settings['dmy_link_enable'])) {
+        return; // 开关关闭时不加载样式
+    }
+
     wp_enqueue_style('dmylink-csf-css', plugin_dir_url(__FILE__) . 'css/dmylink.css', array(), '1.0', 'all');
     
-    $settings = get_option('dmy_link_settings');
     $selected_style = isset($settings['dmy_link_style']) ? $settings['dmy_link_style'] : 'dmylink-default';
 
     if ($selected_style) {
@@ -77,30 +89,55 @@ function generate_random_string($length = 16) {
 
 // 拦截所有外部链接并生成跳转Key
 function dmy_link_intercept_links($content) {
-    return preg_replace_callback('/<a\s+(?:[^>]*?\s+)?href="([^"]*)"/i', function($matches) {
-        $url = $matches[1];
+    // 检查总开关状态
+    $settings = get_option('dmy_link_settings');
+    if (empty($settings['dmy_link_enable'])) {
+        return $content; // 开关关闭时返回原始内容
+    }
 
-        // 检查是否是内部链接或白名单链接
-        if (!is_internal_link($url) && !is_whitelisted_link($url, 'dmy_link_settings')) {
-            $encrypted_key = dmy_link_encrypt_url($url);
-            $settings = get_option('dmy_link_settings');
-            
-            // 根据加密方式设置过期时间
-            $method = isset($settings['dmy_link_verification_method']) ? $settings['dmy_link_verification_method'] : 'random_string';
-            
-            if ($method === 'random_string') {
-                $expiration = isset($settings['dmy_link_expiration']) ? intval($settings['dmy_link_expiration']) : 5;
-                $expiration_time = $expiration * 60;
-                set_transient('dmy_link_' . $encrypted_key, $url, $expiration_time);
-            } else {
-                // AES方式永不过期（0表示永不过期）
-                set_transient('dmy_link_' . $encrypted_key, $url, 0);
+    return preg_replace_callback(
+        '/<a\s+([^>]*?)href="([^"]*)"([^>]*?)>/i', 
+        function($matches) {
+            $url = $matches[2];
+            $beforeHref = $matches[1];
+            $afterHref = $matches[3];
+
+            // 检查是否是内部链接或白名单链接
+            if (!is_internal_link($url) && !is_whitelisted_link($url, 'dmy_link_settings')) {
+                $encrypted_key = dmy_link_encrypt_url($url);
+                $settings = get_option('dmy_link_settings');
+                
+                // 根据加密方式设置过期时间
+                $method = isset($settings['dmy_link_verification_method']) ? $settings['dmy_link_verification_method'] : 'random_string';
+                
+                if ($method === 'random_string') {
+                    $expiration = isset($settings['dmy_link_expiration']) ? intval($settings['dmy_link_expiration']) : 5;
+                    $expiration_time = $expiration * 60;
+                    set_transient('dmy_link_' . $encrypted_key, $url, $expiration_time);
+                } else {
+                    // AES方式永不过期（0表示永不过期）
+                    set_transient('dmy_link_' . $encrypted_key, $url, 0);
+                }
+                
+                $newHref = esc_url(home_url('/dinterception?a=' . $encrypted_key));
+                
+                // 检查是否已有 target="_blank"
+                if (!preg_match('/target\s*=\s*[\'"][^"\']*_blank[^"\']*[\'"]/i', $afterHref)) {
+                    $afterHref .= ' target="_blank"';
+                }
+                
+                return '<a ' . $beforeHref . 'href="' . $newHref . '"' . $afterHref . '>';
             }
             
-            return '<a href="' . esc_url(home_url('/dinterception?a=' . $encrypted_key)) . '" target="_blank">';
-        }
-        return $matches[0];
-    }, $content);
+            // 检查原始链接是否已有 target="_blank"
+            if (!preg_match('/target\s*=\s*[\'"][^"\']*_blank[^"\']*[\'"]/i', $afterHref)) {
+                $afterHref .= ' target="_blank"';
+            }
+            
+            return '<a ' . $beforeHref . 'href="' . $url . '"' . $afterHref . '>';
+        }, 
+        $content
+    );
 }
 add_filter('the_content', 'dmy_link_intercept_links');
 
@@ -148,6 +185,12 @@ function is_whitelisted_link($url, $option_name) {
 }
 // 部分代码是不使用的老代码/在部分情况可以触发
 function dmy_link_redirect() {
+    // 检查总开关状态
+    $settings = get_option('dmy_link_settings');
+    if (empty($settings['dmy_link_enable'])) {
+        return; // 开关关闭时不处理重定向
+    }
+
     if (isset($_GET['a'])) {
         $encrypted_key = sanitize_text_field($_GET['a']);
         $link = get_transient('dmy_link_' . $encrypted_key);
@@ -215,6 +258,12 @@ add_action('wp_ajax_dmylink_convert', 'dmylink_ajax_convert');
 add_action('wp_ajax_nopriv_dmylink_convert', 'dmylink_ajax_convert');
 
 function dmylink_ajax_convert() {
+    // 检查总开关状态
+    $settings = get_option('dmy_link_settings');
+    if (empty($settings['dmy_link_enable'])) {
+        wp_send_json_error(array('message' => '插件已关闭'));
+    }
+
     $url = isset($_POST['url']) ? esc_url_raw($_POST['url']) : '';
 
     // 站内或白名单直接放行
@@ -239,12 +288,36 @@ function dmylink_ajax_convert() {
 
     wp_send_json_success(array('url' => home_url("/dinterception?a=" . urlencode($encrypted_key))));
 }
-// 根据设置条件加载圈子功能脚本
+
+
+// 根据设置条件加载圈子或社区功能脚本
 add_action( 'wp_enqueue_scripts', function () {
+    // 检查总开关状态
     $settings = get_option('dmy_link_settings');
+    if (empty($settings['dmy_link_enable'])) {
+        return; // 开关关闭时不加载脚本
+    }
+
+    // 检查启用的功能类型
+    $enabled_type = '';
+    $selector = '';
     
-    // 检查是否启用了圈子功能
-    if (isset($settings['dmy_link_enable_circle']) && $settings['dmy_link_enable_circle']) {
+    if (isset($settings['dmy_link_function_type'])) {
+        $enabled_type = $settings['dmy_link_function_type'];
+        
+        if ($enabled_type === 'circle') {
+            $selector = isset($settings['dmy_link_circle_selector']) && !empty($settings['dmy_link_circle_selector']) 
+                ? $settings['dmy_link_circle_selector'] 
+                : '.topic-content';
+        } elseif ($enabled_type === 'forums') {
+            $selector = isset($settings['dmy_link_forums_selector']) && !empty($settings['dmy_link_forums_selector']) 
+                ? $settings['dmy_link_forums_selector'] 
+                : '.forum-article';
+        }
+    }
+    
+    // 如果启用了任一功能，则加载脚本
+    if (!empty($enabled_type) && !empty($selector)) {
         wp_enqueue_script(
             'dmylink-circle',
             plugin_dir_url( __FILE__ ) . 'js/dmylink-circle.js',
@@ -254,13 +327,10 @@ add_action( 'wp_enqueue_scripts', function () {
         );
         
         // 传递选择器设置到JavaScript
-        $circle_selector = isset($settings['dmy_link_circle_selector']) && !empty($settings['dmy_link_circle_selector']) 
-            ? $settings['dmy_link_circle_selector'] 
-            : '.topic-content';
-            
         wp_localize_script('dmylink-circle', 'dmylink_circle_config', array(
-            'selector' => $circle_selector,
-            'ajax_url' => admin_url('admin-ajax.php')
+            'selector' => $selector,
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'function_type' => $enabled_type
         ));
     }
 } );
@@ -287,8 +357,11 @@ register_uninstall_hook(__FILE__, 'dmy_link_uninstall');
 
 // 判断子比主题是否存在
 function is_zibll_themes() {
-    $file = '/wp-content/themes/zibll/style.css';
-    return file_exists($file);
+    // 构建 zibll 主题 style.css 的绝对路径
+    $style_file_path = WP_CONTENT_DIR . '/themes/zibll/style.css';
+    
+    // 检测文件是否存在且为文件（排除目录）
+    return file_exists($style_file_path) && is_file($style_file_path);
 }
 
 //评论者链接重定向
@@ -299,6 +372,11 @@ if (is_zibll_themes()){
     add_filter('comment_text', 'dmy_add_redirect_comment_link', 99);
     function dmy_add_redirect_comment_link($text = '')
     {
+        // 检查总开关状态
+        $settings = get_option('dmy_link_settings');
+        if (empty($settings['dmy_link_enable'])) {
+            return $text; // 开关关闭时返回原始内容
+        }
         return dmy_link_intercept_links($text);
     }
 }

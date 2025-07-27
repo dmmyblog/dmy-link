@@ -1,14 +1,23 @@
+<?php
+// 获取子比logo
+if (is_zibll_themes()){
+    $logourl = _pz('logo_src');
+} else {
+    $logourl = esc_url($logo_url);
+}
+?>
 <!DOCTYPE html>
 <html class="dmy-overall-html">
 <head>
     <title>即将离开<?php echo get_bloginfo('name'); ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex,nofollow">
+    <link rel='stylesheet' href='<?php echo $css_url; ?>' type='text/css'/>
     <?php 
     $settings = get_option('dmy_link_settings');
     $style = isset($settings['dmy_link_style']) ? $settings['dmy_link_style'] : 'dmylink-default';
     ?>
-    <?php wp_head(); ?>
+    <?php //wp_head(); ?>
 </head>
 <body class="dmy-overall-body">
     <div class="dmy-logo-box">

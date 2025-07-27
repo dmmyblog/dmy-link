@@ -38,8 +38,8 @@ $css_url = plugin_dir_url(__FILE__) . 'css/' . $style . '.css';
 // 检查文件是否存在，不存在则使用默认样式
 if (!file_exists($css_file)) {
     $style = 'dmylink-default';
-    $css_file = plugin_dir_path(__FILE__) . 'css/' . $style . '.css';
-    $css_url = plugin_dir_url(__FILE__) . 'css/' . $style . '.css';
+    $css_file = plugin_dir_path(__FILE__) . '/css/' . $style . '.css';
+    $css_url = plugin_dir_url(__FILE__) . '/css/' . $style . '.css';
 }
 
 // 仅当文件存在时才加载样式
@@ -48,14 +48,14 @@ if (file_exists($css_file)) {
 }
 
 // 安全加载头部模板
-// $header_file = plugin_dir_path(__FILE__) . 'templates/header.php';
-// if (file_exists($header_file)) {
-//     include_once $header_file;
-// } else {
-//     // 头部模板缺失的fallback
-//     get_header();
-//     echo '<div class="container">';
-// }
+$header_file = plugin_dir_path(__FILE__) . 'templates/header.php';
+if (file_exists($header_file)) {
+    include_once $header_file;
+} else {
+    // 头部模板缺失的fallback
+    get_header();
+    echo '<div class="container">';
+}
 
 // 确定要加载的模板文件
 $template_file = isset(DMYLINK_TEMPLATES[$style]) ? 
@@ -84,3 +84,6 @@ if (file_exists($template_path)) {
 // 加载页面底部
 //wp_footer();
 ?>
+</div>
+</body>
+</html>
