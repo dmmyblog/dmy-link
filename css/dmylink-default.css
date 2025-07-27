@@ -1,0 +1,94 @@
+/* dmylink-tencent.css */
+.dmy-overall-html,
+.dmy-overall-body {
+  height: 100%;
+  background-image: linear-gradient(-225deg, #2CD8D5 0%, #C5C1FF 56%, #FFBAC3 100%);
+}
+
+.dmylink-default-box {
+  padding-top: 220px;
+  width: 450px;
+  margin: auto;
+  word-break: break-all;
+}
+
+@media (max-width: 768px) {
+
+  .dmy-overall-html,
+  .dmy-overall-body {
+    background-size: cover;
+  }
+
+  .dmylink-default-box {
+    padding-top: 120px;
+    width: 94%;
+  }
+}
+
+.dmylink-default-title {
+  position: relative;
+  z-index: 9997;
+  background: rgba(255, 255, 255, 0.2);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(20px);
+  border-radius: 15px;
+  box-shadow: inset 0 0 6px rgba(255, 255, 255, 0.2);
+  padding: 35px;
+  box-sizing: border-box;
+  border: 1px solid #e5e6eb;
+  margin-top: 25px;
+  width: 100%;
+}
+
+.dmylink-default-title-text {
+  font-size: 20px;
+  font-weight: 600;
+  color: #222226;
+  line-height: 22px;
+  margin-left: 10px;
+}
+
+.dmylink-default-titlelink {
+  padding: 10px 0 10px;
+  position: relative;
+  color: gray;
+  font-family: "PingFang SC";
+  font-size: 14px;
+  word-break: break-all;
+  margin-top: 10px;
+}
+
+.dmylink-default-link-a {
+  text-align: right;
+  margin: 25px 0 0;
+}
+
+.dmylink-default-link-a a {
+  display: inline-block;
+  min-width: 100px;
+  height: 45px;
+  line-height: 44px;
+  text-align: center;
+  background: #fb7299;
+  font-size: 14px;
+  font-weight: 400;
+  color: #fff;
+  border-radius: 25px;
+  text-decoration: none;
+}
+
+.dmylink-default-logo img {
+  display: block;
+  width: 200px;
+  margin: auto;
+  margin-bottom: 16px;
+}
+
+.dmylink-default-title-icon {
+  display: flex;
+  align-items: center;
+}
+
+.dmylink-default-title-icon img {
+  width: 35px;
+}

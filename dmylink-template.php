@@ -1,180 +1,88 @@
-<!DOCTYPE html>
-<html class="dmy-overall-html">
+<?php
+/**
+ * 大绵羊外链跳转模板(优化版)
+ * 
+ * 安全加载跳转页面模板，包含错误处理和缓存机制
+ */
 
-<head>
-    <title>即将离开
-        <?php echo get_bloginfo('name'); ?>
-    </title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <?php wp_head(); ?>
-</head>
+// 缓存设置数据
+static $settings = null;
+if ($settings === null) {
+    $settings = get_option('dmy_link_settings');
+}
 
-<body class="dmy-overall-body">
-    <div class="dmy-logo-box">
-        <?php
-        $settings = get_option('dmy_link_settings');
-        $logo_url = isset($settings['dmy_link_logo']) ? $settings['dmy_link_logo'] : plugins_url('/assets/img/default-logo.png', __FILE__);
-        ?>
-    </div>
-    <!-- 默认风格 -->
-    <div class="dmylibk-default">
-        <div class="dmylibk-default-box">
-            <!-- logo -->
-            <div class="dmylibk-default-logo">
-                <img src="<?php echo esc_url($logo_url); ?>" alt="<?php echo get_bloginfo('name'); ?>logo">
-            </div>
-            <!-- 内容 -->
-            <div class="dmylibk-default-title">
-                <div class="dmylibk-default-title-div">
-                    <div class="dmylibk-default-title-icon">
-                        <img class="loading-img"
-                            src="<?php echo plugins_url('assets\img\dmylibk-default.png', __FILE__); ?>"
-                            alt="<?php echo get_bloginfo('name'); ?>-提示警告">
-                        <div class="dmylibk-default-title-text">请注意您的账号和财产安全</div>
-                    </div>
-                    <div class="dmylibk-default-titlelink">
-                        <span>
-                            您即将离开
-                            <?php echo get_bloginfo('name'); ?>，去往:
-                            <?php echo esc_url($link); ?> 请注意您的帐号和财产安全
-                        </span>
-                    </div>
-                </div>
-                <div class="dmylibk-default-link-a">
-                    <a href="<?php echo esc_url($link); ?>">继续访问</a>
-                    <a href="<?php echo home_url(); ?>">返回首页</a>
-                </div>
-            </div>
-        </div>
-    </div>
+// 获取风格标识
+static $style = null;
+if ($style === null) {
+    $style = isset($settings['dmy_link_style']) ? 
+             sanitize_text_field($settings['dmy_link_style']) : 
+             'dmylink-default';
+}
 
+// 定义风格模板映射
+define('DMYLINK_TEMPLATES', [
+    'dmylink-bilibili' => 'bilibili-style.php',
+    'dmylink-tencent'  => 'tencent-style.php',
+    'dmylink-csdn'     => 'csdn-style.php',
+    'dmylink-zhihu'    => 'zhihu-style.php',
+    'dmylink-jump'     => 'jump-style.php',
+    'dmylink-default'  => 'default-style.php',
+    'dmylink-moxing'   => 'moxing-style.php',
+    'dmylink-tiktok'   => 'tiktok-style.php'
+]);
 
-    <!-- bilibili风格 -->
-    <div class="dmylibk-bilibili">
-        <div class="dmylibk-bilibili-box">
-            <!-- 内容 -->
-            <div class="dmylibk-bilibili-title">
-                <div class="dmylibk-bilibili-title-div-title-no2">
-                    <div class="dmylibk-bilibili-title-icon"> <img class="loading-img"
-                            src="<?php echo plugins_url('assets\img\dmylibk-bilibili.png', __FILE__); ?>" alt="">
-                        <div class="dmylibk-bilibili-title-text">即将离开
-                            <?php echo get_bloginfo('name'); ?>，请保护好个人信息
-                        </div>
-                    </div>
+// 确保样式表加载
+$css_file = plugin_dir_path(__FILE__) . 'css/' . $style . '.css';
+$css_url = plugin_dir_url(__FILE__) . 'css/' . $style . '.css';
 
+// 检查文件是否存在，不存在则使用默认样式
+if (!file_exists($css_file)) {
+    $style = 'dmylink-default';
+    $css_file = plugin_dir_path(__FILE__) . 'css/' . $style . '.css';
+    $css_url = plugin_dir_url(__FILE__) . 'css/' . $style . '.css';
+}
 
-                    <div class="dmylibk-bilibili-title-div">
-                        <div class="dmylibk-csdn-title-icon">
-                            <img class="loading-img"
-                                src="<?php echo plugins_url('assets\img\dmylink-bilibili-link.png', __FILE__); ?>"
-                                alt="<?php echo get_bloginfo('name'); ?>-提示警告">
-                            <span>
-                                <?php echo esc_url($link); ?>
-                            </span>
-                        </div>
-                    </div>
-                    <div class="dmylibk-bilibili-link-a">
-                        <a class="dmylibk-bilibili-link-a-no1" href="<?php echo home_url(); ?>">返回首页</a>
-                        <a class="dmylibk-bilibili-link-a-no2" href="<?php echo esc_url($link); ?>">继续访问</a>
-                    </div>
-                </div>
+// 仅当文件存在时才加载样式
+if (file_exists($css_file)) {
+    wp_enqueue_style('dmylink-template-style', $css_url, array(), filemtime($css_file));
+}
 
-            </div>
-        </div>
+// 安全加载头部模板
+$header_file = plugin_dir_path(__FILE__) . 'templates/header.php';
+if (file_exists($header_file)) {
+    include_once $header_file;
+} else {
+    // 头部模板缺失的fallback
+    get_header();
+    echo '<div class="container">';
+}
 
-    </div>
-    <!-- 腾讯风格 2025-1-26-->
-    <div class="dmylibk-tencent">
-        <div class="dmylibk-tencent-box">
-            <!-- logo -->
-            <div class="dmylibk-tencent-logo">
-                <img src="<?php echo esc_url($logo_url); ?>" alt="<?php echo get_bloginfo('name'); ?>logo">
-            </div>
-            <!-- 内容 -->
-            <div class="dmylibk-tencent-title">
-                <div class="dmylibk-tencent-title-div">
-                    <div class="dmylibk-tencent-title-icon">
-                        您即将离开
-                        <?php echo get_bloginfo('name'); ?>，请注意您的账号财产安全
-                    </div>
+// 确定要加载的模板文件
+$template_file = isset(DMYLINK_TEMPLATES[$style]) ? 
+                DMYLINK_TEMPLATES[$style] : 
+                DMYLINK_TEMPLATES['dmylink-default'];
 
-                    <div class="dmylibk-tencent-titlelink">
-                        <a>
-                            <?php echo esc_url($link); ?>
-                        </a>
-                    </div>
-                </div>
-                <div class="dmylibk-tencent-link-a">
-                    <a href="<?php echo esc_url($link); ?>">继续访问
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
+// 安全加载内容模板
+$template_path = plugin_dir_path(__FILE__) . 'templates/' . $template_file;
+if (file_exists($template_path)) {
+    // 添加模板加载调试信息
+    if (WP_DEBUG) {
+        error_log('Loading template: ' . $template_path);
+    }
+    include_once $template_path;
+} else {
+    // 模板缺失的fallback处理
+    if (WP_DEBUG) {
+        error_log('Template not found: ' . $template_path);
+    }
+    echo '<div class="alert alert-warning">';
+    echo '<p>'.__('跳转页面加载失败，请稍后再试。', 'dmylink').'</p>';
+    echo '<p>'.__('当前样式: ', 'dmylink') . esc_html($style) . '</p>';
+    echo '</div>';
+}
 
-    <!-- csnd风格 2025-1-26 -->
-    <div class="dmylibk-csdn">
-        <div class="dmylibk-csdn-box">
-            <!-- logo -->
-            <div class="dmylibk-csdn-logo">
-                <img src="<?php echo esc_url($logo_url); ?>" alt="<?php echo get_bloginfo('name'); ?>logo">
-            </div>
-            <!-- 内容 -->
-            <div class="dmylibk-csdn-title">
-                <div class="dmylibk-csdn-title-div">
-                    <div class="dmylibk-csdn-title-icon">
-                        <img class="loading-img"
-                            src="<?php echo plugins_url('assets\img\dmylibk-csdn.png', __FILE__); ?>"
-                            alt="<?php echo get_bloginfo('name'); ?>-提示警告">
-                        <div class="dmylibk-csdn-title-text">请注意您的账号和财产安全</div>
-                    </div>
-
-                    <div class="dmylibk-csdn-titlelink"><span>您即将离开
-                            <?php echo get_bloginfo('name'); ?>，去往：
-                        </span>
-                        <a>
-                            <?php echo esc_url($link); ?>
-                        </a>
-                    </div>
-                </div>
-                <div class="dmylibk-csdn-link-a">
-                    <a href="<?php echo esc_url($link); ?>">继续</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 知乎风格 2025-1-26-->
-    <div class="dmylibk-zhihu">
-        <div class="dmylibk-zhihu-box">
-            <!-- logo -->
-            <div class="dmylibk-zhihu-logo">
-                <img src="<?php echo esc_url($logo_url); ?>" alt="<?php echo get_bloginfo('name'); ?>logo">
-            </div>
-            <!-- 内容 -->
-            <div class="dmylibk-zhihu-title">
-                <div class="dmylibk-zhihu-title-div">
-                    <div class="dmylibk-zhihu-title-icon">
-                        <div class="dmylibk-zhihu-title-text">即将离开
-                            <?php echo get_bloginfo('name'); ?>
-                        </div>
-                        <p>您即将离开
-                            <?php echo get_bloginfo('name'); ?>，请注意您的帐号和财产安全。
-                        </p>
-                        <p class="dmylibk-zhihu-titlelink-p-no2">
-                            <?php echo esc_url($link); ?>
-                        </p>
-                    </div>
-                    <div class="dmylibk-zhihu-link-a">
-                        <a href="<?php echo esc_url($link); ?>">继续访问</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-
-    <?php wp_footer(); ?>
+// 加载页面底部
+wp_footer();
+?>
 </body>
-
 </html>

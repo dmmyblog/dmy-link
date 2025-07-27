@@ -1,0 +1,152 @@
+/* 2025-6-15编写 */
+.dmy-overall-body {
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  margin: 0;
+}
+
+.dmylink-jump-box {
+  padding-top: 220px;
+  width: 450px;
+  margin: auto;
+  word-break: break-all;
+}
+
+@media (max-width: 768px) {
+
+  .dmy-overall-html,
+  .dmy-overall-body {
+    background-size: cover;
+  }
+
+  .dmylink-jump-box {
+    padding-top: 120px;
+    width: 94%;
+  }
+}
+
+.dmylink-jump-title {
+  position: relative;
+  background: rgba(255, 255, 255, 0.97);
+  padding: 50px 60px;
+  border-radius: 25px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+  text-align: center;
+  transform: translateY(-50px);
+  animation: slideIn 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+.dmylink-jump-title-text {
+  font-size: 20px;
+  font-weight: 600;
+  color: #222226;
+  line-height: 22px;
+  margin-left: 10px;
+}
+
+.dmylink-jump-titlelink {
+  padding: 10px 0 10px;
+  position: relative;
+  color: gray;
+  font-family: "PingFang SC";
+  font-size: 14px;
+  word-break: break-all;
+  margin-top: 10px;
+}
+
+.dmylink-jump-link-a {
+  text-align: right;
+  margin: 25px 0 0;
+}
+
+.dmylink-jump-link-a a {
+  display: inline-block;
+  min-width: 100px;
+  height: 45px;
+  line-height: 44px;
+  text-align: center;
+  background: #fb7299;
+  font-size: 14px;
+  font-weight: 400;
+  color: #fff;
+  border-radius: 25px;
+  text-decoration: none;
+}
+
+.dmylink-jump-logo img {
+  display: block;
+  width: 200px;
+  margin: auto;
+  margin-bottom: 16px;
+}
+
+.dmylink-jump-title-icon {
+  display: flex;
+  align-items: center;
+}
+
+.dmylink-jump-title-icon img {
+  width: 35px;
+}
+
+.dmylink-jump-alert-icon {
+  width: 80px;
+  height: 80px;
+  margin: -80px auto 20px;
+  background: #667eea;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+  animation: iconBounce 0.8s ease;
+}
+
+.dmylink-jump h1 {
+  color: #2d3748;
+  margin-bottom: 20px;
+  font-size: 2.4em;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.dmylink-jump p {
+  color: #4a5568;
+  margin-bottom: 30px;
+  line-height: 1.6;
+  font-size: 1.1em;
+}
+
+.dmylink-jump-cancel-btn a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 25px;
+  padding: 12px 24px;
+  color: #667eea;
+  text-decoration: none;
+  font-weight: bold;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  transition: transform .35s ease, box-shadow .35s ease;
+}
+
+
+.dmylink-jump-cancel-btn a:hover {
+  transform: translateY(-5px);
+}
+
+.dmylink-jump-color a {
+  color: cornflowerblue;
+}
+.dmylink-jump-alert-icon svg{
+  width: 40px;
+  height: 40px;
+  fill: #fff;
+}

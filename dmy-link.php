@@ -2,24 +2,23 @@
 /*
 Plugin Name: 大绵羊外链跳转插件
 Description: 大绵羊外链跳转插件是一个非常实用的WordPress插件，它可以对文章中的外链进行过滤，有效地防止追踪和提醒用户。
-Version: 1.2.1
+Version: 1.2.0
 Author: 大绵羊
 Author URI: https://dmyblog.cn
 */
 
-// 引入 Codestar Framework 进行插件设置
-$current_theme = wp_get_theme();
-// 动态加载Codestar框架
-if ($current_theme && $current_theme->get('Name') === '子比主题') {
-    require_once plugin_dir_path(__FILE__) . 'inc/codestar-framework/codestar-framework.php';
-} else {
-    require_once plugin_dir_path(__FILE__) . 'codestar-framework/codestar-framework.php';
+// 定义插件URL常量
+if (!defined('DMY_LINK_URL')) {
+    define('DMY_LINK_URL', plugin_dir_url(__FILE__));
 }
+
+// 引入 Codestar Framework 进行插件设置
+require_once plugin_dir_path(__FILE__) . 'codestar-framework/codestar-framework.php';
 require_once plugin_dir_path(__FILE__) . 'codestar-framework/admin-settings/dmylink-settings.php';
 
 // 加载 CSS 样式
 function dmy_link_enqueue_styles() {
-    wp_enqueue_style('dmylink-csf-css', plugin_dir_url(__FILE__) . 'css/dmylink.css', array(), '1.0', 'all');
+    // wp_enqueue_style('dmylink-csf-css', plugin_dir_url(__FILE__) . 'css/dmylink.css', array(), '1.0', 'all');
     
     $settings = get_option('dmy_link_settings');
     $selected_style = isset($settings['dmy_link_style']) ? $settings['dmy_link_style'] : 'dmylink-default';
@@ -43,29 +42,62 @@ function dmy_link_enqueue_styles() {
 }
 add_action('wp_enqueue_scripts', 'dmy_link_enqueue_styles');
 
-// 生成 16 位随机字符串
+// 统一URL加密函数
+function dmy_link_encrypt_url($url) {
+    $settings = get_option('dmy_link_settings');
+    $method = isset($settings['dmy_link_verification_method']) ? $settings['dmy_link_verification_method'] : 'random_string';
+    
+    if ($method === 'aes_encryption') {
+        // AES加密方式（固定IV实现）
+        $key = isset($settings['dmy_link_aes_key']) ? $settings['dmy_link_aes_key'] : '';
+        if (empty($key)) {
+            // 密钥未设置时使用随机字符串方式
+            return generate_random_string(16);
+        }
+        
+        // 使用密钥派生固定IV（确保相同URL生成相同加密结果）
+        $iv = substr(hash('sha256', $key, true), 0, 16);
+        $encrypted = openssl_encrypt($url, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+        return base64_encode($encrypted);
+    } else {
+        // 随机字符串方式（默认）
+        return generate_random_string(16);
+    }
+}
+
+// 生成随机字符串（用于随机字符串方式）
 function generate_random_string($length = 16) {
     $characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     $random_string = '';
     for ($i = 0; $i < $length; $i++) {
         $random_string .= $characters[rand(0, strlen($characters) - 1)];
     }
-    return $random_string . '_' . time(); 
+    return $random_string . '_' . time();
 }
 
-// 拦截所有外部链接并生成随机跳转 Key
+// 拦截所有外部链接并生成跳转Key
 function dmy_link_intercept_links($content) {
     return preg_replace_callback('/<a\s+(?:[^>]*?\s+)?href="([^"]*)"/i', function($matches) {
         $url = $matches[1];
 
         // 检查是否是内部链接或白名单链接
         if (!is_internal_link($url) && !is_whitelisted_link($url, 'dmy_link_settings')) {
-            $random_key = generate_random_string(16);
+            $encrypted_key = dmy_link_encrypt_url($url);
             $settings = get_option('dmy_link_settings');
-            $expiration = isset($settings['dmy_link_expiration']) ? intval($settings['dmy_link_expiration']) : 5; // 默认过期时间为5分钟
-            set_transient('dmy_link_' . $random_key, $url, $expiration * 60); // 存储时间
-
-            return '<a href="' . esc_url(home_url('/redirect?a=' . $random_key)) . '" target="_blank">';
+            
+            // 根据加密方式设置过期时间
+            $method = isset($settings['dmy_link_verification_method']) ? $settings['dmy_link_verification_method'] : 'random_string';
+            
+            if ($method === 'random_string') {
+                $expiration = isset($settings['dmy_link_expiration']) ? intval($settings['dmy_link_expiration']) : 5;
+                $expiration_time = $expiration * 60;
+                set_transient('dmy_link_' . $encrypted_key, $url, $expiration_time);
+            } else {
+                // AES方式永不过期（0表示永不过期）
+                set_transient('dmy_link_' . $encrypted_key, $url, 0);
+            }
+            
+            return '<a href="' . esc_url(home_url('/dinterception?a=' . $encrypted_key)) . '" target="_blank">';
         }
         return $matches[0];
     }, $content);
@@ -114,11 +146,26 @@ function is_whitelisted_link($url, $option_name) {
 
     return false;
 }
-
+// 部分代码是不使用的老代码/在部分情况可以触发
 function dmy_link_redirect() {
     if (isset($_GET['a'])) {
-        $random_key = sanitize_text_field($_GET['a']);
-        $link = get_transient('dmy_link_' . $random_key);
+        $encrypted_key = sanitize_text_field($_GET['a']);
+        $link = get_transient('dmy_link_' . $encrypted_key);
+        
+        // 尝试AES解密（如果是AES加密的链接）
+        if (!$link) {
+            $settings = get_option('dmy_link_settings');
+            if (isset($settings['dmy_link_verification_method']) && 
+                $settings['dmy_link_verification_method'] === 'aes_encryption' &&
+                !empty($settings['dmy_link_aes_key'])) {
+                
+                $key = $settings['dmy_link_aes_key'];
+                // 使用密钥派生固定IV（与加密过程一致）
+                $iv = substr(hash('sha256', $key, true), 0, 16);
+                $encrypted = base64_decode($encrypted_key);
+                $link = openssl_decrypt($encrypted, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+            }
+        }
 
         if (!$link) {
             // 返回首页的按钮
@@ -145,21 +192,79 @@ add_action('init', 'dmy_link_redirect');
 
 // 添加重定向规则
 function dmy_link_rewrite_rules() {
-    add_rewrite_rule('^redirect/?$', 'index.php?redirect=1', 'top');
+    add_rewrite_rule('^dinterception/?$', 'index.php?dinterception=1', 'top');
 }
 add_action('init', 'dmy_link_rewrite_rules');
 
 // 添加查询变量
 function dmy_link_query_vars($vars) {
-    $vars[] = 'redirect';
+    $vars[] = 'dinterception';
     return $vars;
 }
 add_filter('query_vars', 'dmy_link_query_vars');
 
 // 处理重定向逻辑
 function dmy_link_template_redirect() {
-    if (get_query_var('redirect') == 1) {
+    if (get_query_var('dinterception') == 1) {
         dmy_link_redirect();
     }
 }
 add_action('template_redirect', 'dmy_link_template_redirect');
+// 注册WordPress原生AJAX处理
+add_action('wp_ajax_dmylink_convert', 'dmylink_ajax_convert');
+add_action('wp_ajax_nopriv_dmylink_convert', 'dmylink_ajax_convert');
+
+function dmylink_ajax_convert() {
+    $url = isset($_POST['url']) ? esc_url_raw($_POST['url']) : '';
+
+    // 站内或白名单直接放行
+    if (is_internal_link($url) || is_whitelisted_link($url, 'dmy_link_settings')) {
+        wp_send_json_success(array('url' => $url));
+    }
+
+    // 使用统一加密函数
+    $encrypted_key = dmy_link_encrypt_url($url);
+    $settings = get_option('dmy_link_settings');
+    
+    // 根据加密方式设置过期时间
+    $method = isset($settings['dmy_link_verification_method']) ? $settings['dmy_link_verification_method'] : 'random_string';
+    
+    if ($method === 'random_string') {
+        $ttl = isset($settings['dmy_link_expiration']) ? (int)$settings['dmy_link_expiration'] : 5;
+        set_transient('dmy_link_' . $encrypted_key, $url, $ttl * 60);
+    } else {
+        // AES方式永不过期
+        set_transient('dmy_link_' . $encrypted_key, $url, 0);
+    }
+
+    wp_send_json_success(array('url' => home_url("/dinterception?a=" . urlencode($encrypted_key))));
+}
+add_action( 'wp_enqueue_scripts', function () {
+    wp_enqueue_script(
+        'dmylink-circle',
+        plugin_dir_url( __FILE__ ) . 'js/dmylink-circle.js',
+        array(),            
+        '1.0.0',
+        true                
+    );
+} );
+
+// 插件卸载时清理数据
+function dmy_link_uninstall() {
+    // 删除插件设置选项
+    delete_option('dmy_link_settings');
+    
+    // 清理所有插件相关的transient数据
+    global $wpdb;
+    $transients = $wpdb->get_col(
+        "SELECT option_name FROM $wpdb->options 
+        WHERE option_name LIKE '_transient_dmy_link_%' 
+        OR option_name LIKE '_transient_timeout_dmy_link_%'"
+    );
+    
+    foreach ($transients as $transient) {
+        $name = str_replace('_transient_', '', $transient);
+        delete_transient($name);
+    }
+}
+register_uninstall_hook(__FILE__, 'dmy_link_uninstall');

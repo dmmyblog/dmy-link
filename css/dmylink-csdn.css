@@ -1,0 +1,96 @@
+/* 2025-1-26更新 */
+.dmy-overall-body,
+.dmy-overall-html {
+  background: #F3F4F5;
+  font-family: PingFang SC, Hiragino Sans GB, Arial, Microsoft YaHei, Verdana, Roboto, Noto, Helvetica Neue, sans-serif;
+}
+
+.dmylink-csdn-box {
+  padding-top: 220px;
+  width: 450px;
+  margin: auto;
+  word-break: break-all;
+}
+
+@media (max-width: 450px) {
+  .dmylink-csdn-box {
+    padding-top: 120px;
+    width: 94%;
+  }
+}
+
+.dmylink-csdn-title {
+  position: relative;
+  z-index: 9997;
+  background: #fff;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid #E1E1E1;
+}
+
+.dmylink-csdn-title-icon {
+  display: flex;
+  align-items: center;
+
+  padding: 12px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  background: #FDF5E6;
+}
+
+.dmylink-csdn-title-icon img {
+  width: 24px;
+  height: 24px;
+}
+
+.dmylink-csdn-title-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #222226;
+  line-height: 22px;
+  margin-left: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dmylink-csdn-titlelink {
+  font-size: 14px;
+  font-weight: 500;
+  color: #222226;
+  line-height: 24px;
+  margin-bottom: 24px;
+}
+
+.dmylink-csdn-titlelink a {
+  color: #FC5531;
+  text-decoration: none;
+}
+
+
+
+.dmylink-csdn-link-a {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.dmylink-csdn-link-a a {
+  white-space: nowrap;
+  font-size: 14px;
+  color: #FC5531;
+  border: 1px solid #FC5531;
+  display: inline-block;
+  box-sizing: border-box;
+  padding: 6px 18px;
+  border-radius: 18px;
+  margin-left: 8px;
+  text-decoration: none;
+}
+
+.dmylink-csdn-logo img {
+  display: block;
+  width: 200px;
+  margin: auto;
+  margin-bottom: 16px;
+}

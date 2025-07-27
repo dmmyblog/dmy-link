@@ -1,0 +1,181 @@
+    .dmy-overall-body,
+    .dmy-overall-html {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    .dmy-tiktok-page-header {
+      position: relative;
+      height: 70px;
+      background: #fff;
+      box-shadow: 0 1px 0 #eaeaeb;
+    }
+
+    .dmy-tiktok-page-header .dmy-tiktok-site-logo {
+      position: absolute;
+      width: 118px;
+      height: 42px;
+      left: 20px;
+      top: calc(50% - 42px/2);
+    }
+
+    .dmy-tiktok-main-container {
+      margin: 0 auto;
+      width: 987px;
+      height: 428px;
+      margin-top: 80px;
+      background: #fff;
+      box-shadow: 2px 4px 20px rgba(34, 90, 89, 0.2);
+      border-radius: 8px;
+    }
+
+    .dmy-tiktok-external-link-image {
+      padding-top: 32px;
+      text-align: center;
+    }
+
+    .dmy-tiktok-external-link-image .image {
+      height: 72px;
+    }
+
+    .dmy-tiktok-external-link-header {
+      margin-top: 32px;
+      text-align: center;
+      font-family: 'Tiktok Text';
+      font-weight: 600;
+      font-size: 18px;
+      line-height: 25px;
+    }
+
+    .dmy-tiktok-external-link-detail {
+      margin-top: 10px;
+    }
+
+    .dmy-tiktok-external-link-detail-text {
+      margin: 0 auto;
+      width: 387px;
+      font-family: 'Tiktok Text';
+      font-weight: normal;
+      font-size: 16px;
+      line-height: 22px;
+      text-align: center;
+      color: rgba(22, 24, 35, 0.75);
+    }
+
+    .dmy-tiktok-button-group {
+      text-align: center;
+    }
+
+    .dmy-tiktok-button-group button {
+      cursor: pointer;
+      width: 387px;
+      height: 48px;
+      border-radius: 2px;
+    }
+
+    .dmy-tiktok-button-open-anyway-group {
+      margin-top: 8px;
+    }
+
+    .dmy-tiktok-button-text {
+      font-family: 'Tiktok Text';
+      font-weight: 600;
+      font-size: 18px;
+      line-height: 25px;
+    }
+
+    .dmy-tiktok-button-open-link {
+      text-align: center;
+      margin-top: 20px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 387px;
+      margin: 0 auto;
+      border-radius: 2px;
+      background: #fff;
+      border: 1px solid #d5d5d5;
+    }
+
+    .dmy-tiktok-status-suspicious .dmy-tiktok-external-link-detail-text {
+      font-weight: 600;
+      font-size: 18px;
+      line-height: 25px;
+      color: #FF4C3A;
+    }
+
+    .dmy-tiktok-status-suspicious .dmy-tiktok-button-open-anyway-group {
+      margin-top: 32px;
+    }
+
+    .dmy-tiktok-status-suspicious .dmy-tiktok-external-link-image {
+      padding-top: 79px;
+    }
+
+    .dmy-tiktok-status-malicious .dmy-tiktok-external-link-image {
+      padding-top: 110px;
+    }
+
+    .dmy-overall-body .dmy-tiktok-external-link-image {
+      padding-top: 81px;
+    }
+
+    .dmy-overall-body .dmy-tiktok-button-open-anyway-group {
+      margin-top: 32px;
+    }
+
+    .dmy-overall-body .dmy-tiktok-external-link-detail-text {
+      width: 100%;
+    }
+
+    @media only screen and (max-width: 768px) {
+      .dmy-tiktok-page-header {
+        display: none;
+      }
+
+      .dmy-tiktok-main-container {
+        width: 100%;
+        margin: 0 auto;
+        height: 100%;
+        overflow: hidden;
+        padding: 0 32px;
+        box-sizing: border-box;
+        box-shadow: none;
+        border-radius: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .dmy-tiktok-main-container::before,
+      .dmy-tiktok-main-container::after {
+        content: '';
+        display: block;
+        height: 1px;
+        flex-grow: 2;
+      }
+
+      .dmy-tiktok-button-group {
+        order: 2;
+        margin: 0;
+      }
+
+      .dmy-tiktok-button-group button {
+        width: 100%;
+      }
+
+      .dmy-tiktok-external-link-image {
+        padding: 0;
+      }
+
+      .dmy-tiktok-external-link-detail-text {
+        width: 100%;
+      }
+
+      .dmy-tiktok-button-group {
+        margin-bottom: calc(24px + constant(safe-area-inset-bottom) * 12 / 34);
+        margin-bottom: calc(24px + env(safe-area-inset-bottom) * 12 / 34);
+      }
+    }
