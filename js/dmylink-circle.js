@@ -1,10 +1,18 @@
 /**
- * 实时把 .topic-content 内的外链换成跳转链接
+ * 实时把指定选择器内的外链换成跳转链接
+ * 支持动态配置选择器，适配不同主题
  */
 (function () {
+  // 获取配置，如果没有配置则使用默认值
+  const config = window.dmylink_circle_config || {
+    selector: '.topic-content',
+    ajax_url: window.location.origin + '/wp-admin/admin-ajax.php'
+  };
+
   const ROOT = window.location.origin;
-  const API = ROOT + '/wp-admin/admin-ajax.php';
+  const API = config.ajax_url;
   const DOMAIN = window.location.host;
+  const SELECTOR = config.selector;
 
   /** 判断纯外链（含 http/https ，且 host ≠ 当前域名） */
   function isExternal(href) {
@@ -26,7 +34,11 @@
       })
     })
       .then(r => r.json())
-      .then(data => { if (data.url) a.setAttribute('href', data.url); })
+      .then(data => { 
+        if (data.success && data.data && data.data.url) {
+          a.setAttribute('href', data.data.url);
+        }
+      })
       .catch(console.error);
 
     a.dataset.dmylinkDone = '1';
@@ -36,18 +48,21 @@
     root.querySelectorAll('a[href]').forEach(convert);
   }
 
-  // 初次扫描已经渲染好的 topic-content
-  document.querySelectorAll('.topic-content').forEach(scan);
+  // 初次扫描已经渲染好的内容
+  document.querySelectorAll(SELECTOR).forEach(scan);
 
-  // 监听后续 DOM 变化（B2 圈子滚动加载切页都会触发）
+  // 监听后续 DOM 变化（适配动态加载内容）
   const ob = new MutationObserver(list => {
     list.forEach(m => {
       m.addedNodes.forEach(n => {
         if (n.nodeType !== 1) return;
-        if (n.matches('.topic-content')) scan(n);
-        n.querySelectorAll && n.querySelectorAll('.topic-content').forEach(scan);
+        if (n.matches(SELECTOR)) scan(n);
+        n.querySelectorAll && n.querySelectorAll(SELECTOR).forEach(scan);
       });
     });
   });
   ob.observe(document.body, { childList: true, subtree: true });
+
+  // 调试信息
+  console.log('DMY Link Circle 已启用，监听选择器:', SELECTOR);
 })();

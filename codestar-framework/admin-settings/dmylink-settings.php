@@ -14,7 +14,7 @@ if( class_exists( 'CSF' ) ) {
         'menu_title' => '外链跳转插件',
         'framework_title' => '大绵羊外链跳转插件',
         'menu_slug'  => 'dmy_link_settings',
-        'footer_text' => '作者：大绵羊 | 作者网站<a href="https://dmyblog.cn">大绵羊博客</a> | 版本:V1.2.0 | <i class="fa fa-fw fa-heart-o" aria-hidden="true"></i> 感谢您使用大绵羊外链跳转插件。',
+        'footer_text' => '作者：大绵羊 | 作者网站<a href="https://dmyblog.cn">大绵羊博客</a> | 版本:V1.3.0 | <i class="fa fa-fw fa-heart-o" aria-hidden="true"></i> 感谢您使用大绵羊外链跳转插件。',
         // 'footer_credit' => '柠萌主题Pro',
         // 'theme' => 'light'
     ) );
@@ -54,7 +54,30 @@ if( class_exists( 'CSF' ) ) {
                     'dmylink-tiktok' => 'tiktok风格',
 
                 ),
-                'default' => 'dmylibk-default', // 修正默认值
+                'default' => 'dmylink-default', // 修正默认值
+            ),
+        ),
+    ));
+
+    // 7b2主题圈子功能设置
+    CSF::createSection($prefix, array(
+        'title'  => '7b2主题圈子功能',
+        'icon' => 'fa fa-comments',
+        'fields' => array(
+            array(
+                'id'    => 'dmy_link_enable_circle',
+                'type'  => 'switcher',
+                'title' => '启用7b2主题圈子功能',
+                'desc'  => '启用后会自动为7b2主题的圈子页面中的外链添加跳转功能<br/>仅在使用7b2主题且需要圈子功能时开启',
+                'default' => false,
+            ),
+            array(
+                'id'    => 'dmy_link_circle_selector',
+                'type'  => 'text',
+                'title' => '圈子内容选择器',
+                'desc'  => '用于识别圈子内容的CSS选择器，默认为.topic-content<br/>如果您的主题结构不同，可以修改此选择器',
+                'default' => '.topic-content',
+                'dependency' => array('dmy_link_enable_circle', '==', true),
             ),
         ),
     ));

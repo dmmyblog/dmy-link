@@ -18,7 +18,7 @@ require_once plugin_dir_path(__FILE__) . 'codestar-framework/admin-settings/dmyl
 
 // 加载 CSS 样式
 function dmy_link_enqueue_styles() {
-    // wp_enqueue_style('dmylink-csf-css', plugin_dir_url(__FILE__) . 'css/dmylink.css', array(), '1.0', 'all');
+    wp_enqueue_style('dmylink-csf-css', plugin_dir_url(__FILE__) . 'css/dmylink.css', array(), '1.0', 'all');
     
     $settings = get_option('dmy_link_settings');
     $selected_style = isset($settings['dmy_link_style']) ? $settings['dmy_link_style'] : 'dmylink-default';
@@ -239,14 +239,30 @@ function dmylink_ajax_convert() {
 
     wp_send_json_success(array('url' => home_url("/dinterception?a=" . urlencode($encrypted_key))));
 }
+// 根据设置条件加载圈子功能脚本
 add_action( 'wp_enqueue_scripts', function () {
-    wp_enqueue_script(
-        'dmylink-circle',
-        plugin_dir_url( __FILE__ ) . 'js/dmylink-circle.js',
-        array(),            
-        '1.0.0',
-        true                
-    );
+    $settings = get_option('dmy_link_settings');
+    
+    // 检查是否启用了圈子功能
+    if (isset($settings['dmy_link_enable_circle']) && $settings['dmy_link_enable_circle']) {
+        wp_enqueue_script(
+            'dmylink-circle',
+            plugin_dir_url( __FILE__ ) . 'js/dmylink-circle.js',
+            array(),            
+            '1.0.1',
+            true                
+        );
+        
+        // 传递选择器设置到JavaScript
+        $circle_selector = isset($settings['dmy_link_circle_selector']) && !empty($settings['dmy_link_circle_selector']) 
+            ? $settings['dmy_link_circle_selector'] 
+            : '.topic-content';
+            
+        wp_localize_script('dmylink-circle', 'dmylink_circle_config', array(
+            'selector' => $circle_selector,
+            'ajax_url' => admin_url('admin-ajax.php')
+        ));
+    }
 } );
 
 // 插件卸载时清理数据

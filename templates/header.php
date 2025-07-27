@@ -8,7 +8,6 @@
     $settings = get_option('dmy_link_settings');
     $style = isset($settings['dmy_link_style']) ? $settings['dmy_link_style'] : 'dmylink-default';
     ?>
-    <link rel="stylesheet" href="<?php echo plugins_url('/css/' . $style . '.css', dirname(__FILE__, 2)); ?>">
     <?php wp_head(); ?>
 </head>
 <body class="dmy-overall-body">
