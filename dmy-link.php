@@ -2,7 +2,7 @@
 /*
 Plugin Name: 大绵羊外链跳转插件
 Description: 大绵羊外链跳转插件是一个非常实用的WordPress插件，它可以对文章中的外链进行过滤，有效地防止追踪和提醒用户。
-Version: 1.3.4
+Version: 1.3.5
 Author: 大绵羊&天无神话
 Author URI: https://dmyblog.cn
 */
@@ -364,19 +364,233 @@ function is_zibll_themes() {
     return file_exists($style_file_path) && is_file($style_file_path);
 }
 
-//评论者链接重定向
-if (is_zibll_themes()){
+// 适配子比主题：接管评论链接和用户中心重定向
+if (is_zibll_themes()) {
+    // 卸载主题的评论链接重定向钩子
     remove_filter('get_comment_author_link', 'add_redirect_comment_link', 5);
     remove_filter('comment_text', 'add_redirect_comment_link', 99);
-    add_filter('get_comment_author_link', 'dmy_add_redirect_comment_link', 5);
-    add_filter('comment_text', 'dmy_add_redirect_comment_link', 99);
-    function dmy_add_redirect_comment_link($text = '')
-    {
-        // 检查总开关状态
-        $settings = get_option('dmy_link_settings');
-        if (empty($settings['dmy_link_enable'])) {
-            return $text; // 开关关闭时返回原始内容
-        }
-        return dmy_link_intercept_links($text);
+    remove_action('wp_ajax_user_details_data_modal', 'zib_ajax_user_details_data_modal');
+    remove_action('wp_ajax_nopriv_user_details_data_modal', 'zib_ajax_user_details_data_modal');
+    // 挂载插件的评论链接重定向钩子（优先级高于主题）
+    add_filter('get_comment_author_link', 'dmy_add_redirect_comment_link', 6);
+    add_filter('comment_text', 'dmy_add_redirect_comment_link', 100);
+    add_action('wp_ajax_user_details_data_modal', 'dmy_zib_ajax_user_details_data_modal');
+    add_action('wp_ajax_nopriv_user_details_data_modal', 'dmy_zib_ajax_user_details_data_modal');
+}
+
+
+/**
+ * 插件的评论链接处理函数（替换主题的add_redirect_comment_link）
+ */
+function dmy_add_redirect_comment_link($text = '') {
+    $settings = get_option('dmy_link_settings');
+    // 若插件总开关关闭，直接返回原始内容
+    if (empty($settings['dmy_link_enable'])) {
+        return $text."测试";
     }
+    // 处理评论内容中的<a>标签链接
+    return dmy_go_link($text);
+}
+
+/**
+ * 插件的链接处理逻辑（替代主题的go_link）
+ */
+function dmy_go_link($text = '') {
+    $settings = get_option('dmy_link_settings');
+    if (empty($settings['dmy_link_enable'])) {
+        return $text;
+    }
+
+    // 1. 处理纯链接（如评论作者链接，可能直接是URL而非<a>标签）
+    if (preg_match('/^https?:\/\//', $text) && !preg_match('/<a.*?>/', $text)) {
+        if (!is_internal_link($text) && !is_whitelisted_link($text, 'dmy_link_settings')) {
+            return dmy_get_redirect_url($text);
+        }
+        return $text;
+    }
+
+    // 2. 处理带<a>标签的链接（如评论内容中的链接）
+    preg_match_all("/<a(.*?)href=['\"](.*?)['\"](.*?)>/", $text, $matches);
+    if ($matches) {
+        foreach ($matches[2] as $val) {
+            if (!is_internal_link($val) && !is_whitelisted_link($val, 'dmy_link_settings')) {
+                $redirect_url = dmy_get_redirect_url($val);
+                $text = str_replace(
+                    array("href=\"$val\"", "href='$val'"),
+                    "href=\"$redirect_url\"",
+                    $text
+                );
+            }
+        }
+        // 统一添加target="_blank"（避免重复添加）
+        foreach ($matches[0] as $a_tag) {
+            if (!preg_match('/target=["\']_blank["\']/', $a_tag)) {
+                $text = str_replace($a_tag, str_replace('<a', '<a target="_blank"', $a_tag), $text);
+            }
+        }
+    }
+    return $text;
+}
+
+/**
+ * 生成插件的跳转链接（替代主题的zib_get_gourl）
+ */
+function dmy_get_redirect_url($url) {
+    $encrypted_key = dmy_link_encrypt_url($url);
+    // 存储链接（复用插件原有逻辑）
+    $settings = get_option('dmy_link_settings');
+    $method = isset($settings['dmy_link_verification_method']) ? $settings['dmy_link_verification_method'] : 'random_string';
+    if ($method === 'random_string') {
+        $expiration = isset($settings['dmy_link_expiration']) ? intval($settings['dmy_link_expiration']) : 5;
+        set_transient('dmy_link_' . $encrypted_key, $url, $expiration * 60);
+    } else {
+        set_transient('dmy_link_' . $encrypted_key, $url, 0); // AES模式永不过期
+    }
+    return esc_url(home_url('/dinterception?a=' . $encrypted_key));
+}
+
+
+//查看用户全部详细资料的模态框
+function dmy_zib_ajax_user_details_data_modal()
+{
+    $user_id = !empty($_REQUEST['id']) ? $_REQUEST['id'] : '';
+
+    $user = get_userdata($user_id);
+    if (!$user_id || empty($user->ID)) {
+        zib_ajax_notice_modal('danger', '用户不存在或参数传入错误');
+    }
+
+    echo dmy_zib_get_user_details_data_modal($user_id);
+    exit();
+}
+
+
+//获取用户详细资料
+function dmy_zib_get_user_details_data_modal($user_id = '', $class = 'mb10 flex', $t_class = 'muted-2-color', $v_class = '')
+{
+    if (!$user_id) {
+        return;
+    }
+
+    $current_id = get_current_user_id();
+    $udata      = get_userdata($user_id);
+    if (!$udata) {
+        return;
+    }
+
+    $privacy = zib_get_user_meta($user_id, 'privacy', true);
+
+    $datas = array(
+        array(
+            'title'   => '签名',
+            'value'   => get_user_desc($user_id, false),
+            'spare'   => '未知',
+            'no_show' => false,
+        ),
+        array(
+            'title'   => '注册时间',
+            'value'   => get_date_from_gmt($udata->user_registered),
+            'spare'   => '未知',
+            'no_show' => false,
+        ), array(
+            'title'   => '最后登录',
+            'value'   => get_user_meta($user_id, 'last_login', true),
+            'spare'   => '未知',
+            'no_show' => false,
+        ), array(
+            'title'   => '邮箱',
+            'value'   => esc_attr($udata->user_email),
+            'spare'   => '未知',
+            'no_show' => true,
+        ), array(
+            'title'   => '性别',
+            'value'   => esc_attr(get_user_meta($user_id, 'gender', true)),
+            'spare'   => '保密',
+            'no_show' => true,
+        ), array(
+            'title'   => '地址',
+            'value'   => esc_textarea(zib_get_user_meta($user_id, 'address', true)),
+            'spare'   => '未知',
+            'no_show' => true,
+        ), array(
+            'title'   => '个人网站',
+            'value'   => dmy_zib_get_url_link($user_id), //修改
+            'spare'   => '未知',
+            'no_show' => true,
+        ), array(
+            'title'   => 'QQ',
+            'value'   => esc_attr(zib_get_user_meta($user_id, 'qq', true)),
+            'spare'   => '未知',
+            'no_show' => true,
+        ), array(
+            'title'   => '微信',
+            'value'   => esc_attr(zib_get_user_meta($user_id, 'weixin', true)),
+            'spare'   => '未知',
+            'no_show' => true,
+        ), array(
+            'title'   => '微博',
+            'value'   => esc_url(zib_get_user_meta($user_id, 'weibo', true)),
+            'spare'   => '未知',
+            'no_show' => true,
+        ), array(
+            'title'   => 'Github',
+            'value'   => esc_url(zib_get_user_meta($user_id, 'github', true)),
+            'spare'   => '未知',
+            'no_show' => true,
+        ),
+    );
+
+    $lists = '';
+
+    //用户认证
+    if (_pz('user_auth_s', true)) {
+        $auth_name = zib_get_user_auth_info_link($user_id, 'c-blue');
+        $auth_name = $auth_name ? $auth_name : '未认证';
+        $lists .= '<div class="' . $class . '" style="min-width: 50%;">';
+        $lists .= '<div class="author-set-left ' . $t_class . '" style="min-width: 80px;">认证</div>';
+        $lists .= '<div class="author-set-right mt6' . $v_class . '">' . $auth_name . '</div>';
+        $lists .= '</div>';
+    }
+
+    //用户徽章
+    if (_pz('user_medal_s', true)) {
+        $user_medal = zib_get_user_medal_show_link($user_id, '', 5);
+        $user_medal = $user_medal ? $user_medal : '暂无徽章';
+
+        $lists .= '<div class="' . $class . '" style="min-width: 50%;">';
+        $lists .= '<div class="author-set-left ' . $t_class . '" style="min-width: 80px;">徽章</div>';
+        $lists .= '<div class="author-set-right mt6' . $v_class . '">' . $user_medal . '</div>';
+        $lists .= '</div>';
+    }
+
+    foreach ($datas as $data) {
+        if (!is_super_admin() && $data['no_show'] && 'public' != $privacy && $current_id != $user_id) {
+            if (('just_logged' == $privacy && !$current_id) || 'just_logged' != $privacy) {
+                $data['value'] = '用户未公开';
+            }
+        }
+        $lists .= '<div class="' . $class . '" style="min-width: 50%;">';
+        $lists .= '<div class="author-set-left ' . $t_class . '" style="min-width: 80px;">' . $data['title'] . '</div>';
+        $lists .= '<div class="author-set-right mt6' . $v_class . '">' . ($data['value'] ? $data['value'] : $data['spare']) . '</div>';
+        $lists .= '</div>';
+    }
+
+    $header = '<div class="mb10 border-bottom touch" style="padding-bottom: 12px;">';
+    $header .= '<button class="close ml10" data-dismiss="modal">' . zib_get_svg('close', null, 'ic-close') . '</button>';
+    $header .= '<div class="" style="">';
+    $header .= zib_get_post_user_box($user_id);
+    $header .= '</div>';
+    $header .= '</div>';
+
+    $html = '<div class="mini-scrollbar scroll-y max-vh5 flex hh">' . $lists . '</div>';
+    return $header . $html;
+}
+
+
+function dmy_zib_get_url_link($user_id, $class = 'focus-color')
+{
+    $user_url = get_userdata($user_id)->user_url;
+    $url_name = zib_get_user_meta($user_id, 'url_name', true) ?: $user_url;
+    $user_url = dmy_go_link($user_url, true);
+    return $user_url ? '<a class="' . $class . '" href="' . esc_url($user_url) . '" target="_blank">' . esc_attr($url_name) . '</a>' : 0;
 }
