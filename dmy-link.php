@@ -386,7 +386,7 @@ function dmy_add_redirect_comment_link($text = '') {
     $settings = get_option('dmy_link_settings');
     // 若插件总开关关闭，直接返回原始内容
     if (empty($settings['dmy_link_enable'])) {
-        return $text."测试";
+        return $text;
     }
     // 处理评论内容中的<a>标签链接
     return dmy_go_link($text);
