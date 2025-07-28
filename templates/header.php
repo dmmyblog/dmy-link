@@ -1,9 +1,15 @@
 <?php
-// 获取子比logo
-if (is_zibll_themes()){
+$settings = get_option('dmy_link_settings');
+$user_logo = isset($settings['dmy_link_logo']) ? $settings['dmy_link_logo'] : '';
+
+if (!empty($user_logo)) {
+    // 用户上传的logo优先级最高
+    $logourl = esc_url($user_logo);
+} elseif (is_zibll_themes()) {
+    // 如果没有用户logo且是子比主题，使用子比主题logo
     $logourl = _pz('logo_src');
 } else {
-    $logourl = esc_url($logo_url);
+    $logourl = plugins_url('/assets/img/hint.png', dirname(__FILE__));
 }
 ?>
 <!DOCTYPE html>

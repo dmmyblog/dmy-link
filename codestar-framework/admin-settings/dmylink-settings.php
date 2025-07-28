@@ -20,15 +20,19 @@ if( class_exists( 'CSF' ) ) {
     // Set a unique slug-like ID
     $prefix = 'dmy_link_settings';
 
-    // Create options
-    CSF::createOptions( $prefix, array(
-        'menu_title' => '外链跳转插件',
-        'framework_title' => '大绵羊外链跳转插件',
-        'menu_slug'  => 'dmy_link_settings',
-        'footer_text' => '作者：大绵羊 | 作者网站<a href="https://dmyblog.cn">大绵羊博客</a> | 版本:V1.3.0 | <i class="fa fa-fw fa-heart-o" aria-hidden="true"></i> 感谢您使用大绵羊外链跳转插件。',
-        // 'footer_credit' => '柠萌主题Pro',
-        // 'theme' => 'light'
-    ) );
+
+    $options = array(
+        'menu_title'     => '外链跳转插件',
+        'framework_title'=> '大绵羊外链跳转插件',
+        'menu_slug'      => 'dmy_link_settings',
+        'footer_text'    => '作者：大绵羊&天无神话 | 作者网站<a href="https://dmyblog.cn">大绵羊博客</a> | 版本:V1.3.4 | <i class="fa fa-fw fa-heart-o" aria-hidden="true"></i> 感谢您使用大绵羊外链跳转插件。',
+    );
+
+    // 子比主题，启用 light 主题
+    if ( no_zibll_themes() ) {
+        $options['theme'] = 'light';
+    }
+    CSF::createOptions( $prefix, $options );
     // 添加基本设置部分，包含总开关
     CSF::createSection($prefix, array(
         'title'  => '基本设置',
@@ -180,21 +184,14 @@ if( class_exists( 'CSF' ) ) {
                 array(
                     'type' => 'notice',
                     'style' => 'warning', 
-                    'content' => '大绵羊外链跳转插件作者：大绵羊<br/><br/>
-                    你可以任意修改插件作为自己使用，但请不要删除作者信息谢谢！<br/>
-                    作者网站: <a href="https://dmyblog.cn">https://dmyblog.cn</a><br/>
-                    使用的框架: Codestar Framework<br/>
-                    框架参考链接: <a href="https://codestarframework.com">https://codestarframework.com</a>'
+                    'content' => '作者：大绵羊&天无神话<br/>
+                    共同开发:天无神话(<a href="https://wxsnote.cn">王先生笔记</a>)<br/>
+                    作者网站: <a href="https://dmyblog.cn">https://dmyblog.cn</a><br/>'
                 ),
                 array(
                     'type' => 'notice',
                     'style' => 'info', 
-                    'content' => '鸣谢(使用平台素材&或者样式)<br/> 1.哔哩哔哩<br/>2.腾讯云社区<br/>3.知乎<br/>4.CSDN<br/>'
-                ),
-                array(
-                    'type' => 'notice',
-                    'style' => 'info', 
-                    'content' => '鸣谢(共同开发)<br/>大绵羊的大哥：天无神话(<a href="https://wxsnote.cn">王先生笔记</a>)<br/>'
+                    'content' => '鸣谢(使用平台素材&或者样式)<br/> 1.哔哩哔哩<br/>2.腾讯云社区<br/>3.知乎<br/>4.CSDN<br/>5.tiktok<br/>6.墨星博客<br/>7.茉莉小栈<br/>'
                 ),
                 array(
                     'type' => 'notice',
@@ -215,7 +212,12 @@ if( class_exists( 'CSF' ) ) {
                 array(
                     'type' => 'notice',
                     'style' => 'danger', 
-                    'content' => '你不可以抹除这个插件作者的信息，不得说这个插件原创作者为你，你不得将这个插件作为商业使用，因为它本身就作为免费插件发布！<br/>
+                    'content' => '
+                    
+                    使用的框架: Codestar Framework<br/>
+                    框架参考链接: <a href="https://codestarframework.com">https://codestarframework.com</a><br/>
+                    你可以任意修改插件作为自己使用，但请不要删除作者信息谢谢！<br/>
+                    你不可以抹除这个插件作者的信息，不得说这个插件原创作者为你，你不得将这个插件作为商业使用，因为它本身就作为免费插件发布！<br/>
                       若您执意这样做了，我们会保留证据，您将会收到网友的谴责，必要时，我们保留诉讼的权力。'
                 )
             )
