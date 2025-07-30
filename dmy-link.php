@@ -195,6 +195,10 @@ function dmy_link_redirect() {
         $encrypted_key = sanitize_text_field($_GET['a']);
         $link = get_transient('dmy_link_' . $encrypted_key);
         
+        
+        // 修复URL传输中+号被转换为空格的问题
+            $encrypted_key = str_replace(' ', '+', $encrypted_key);
+            error_log('修复后的Encrypted Key: ' . $encrypted_key);
         // 尝试AES解密（如果是AES加密的链接）
         if (!$link) {
             $settings = get_option('dmy_link_settings');
