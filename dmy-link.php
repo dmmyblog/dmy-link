@@ -183,6 +183,53 @@ function is_whitelisted_link($url, $option_name) {
 
     return false;
 }
+
+//
+// Referer 防护辅助函数
+//
+function dmy_is_same_site_referer($referer) {
+    if (empty($referer)) {
+        return false;
+    }
+    $parsed = parse_url($referer);
+    $home   = parse_url(home_url());
+    return isset($parsed['host'], $home['host']) && strcasecmp($parsed['host'], $home['host']) === 0;
+}
+
+function dmy_is_referer_whitelisted($referer, $settings) {
+    if (empty($referer)) {
+        return false;
+    }
+    if (!isset($settings['dmy_link_referer_whitelist']) || !is_string($settings['dmy_link_referer_whitelist'])) {
+        return false;
+    }
+    $whitelist = explode("\n", trim($settings['dmy_link_referer_whitelist']));
+
+    $parsed = parse_url($referer);
+    $host_and_path = (isset($parsed['host']) ? $parsed['host'] : '') . (isset($parsed['path']) ? $parsed['path'] : '');
+
+    foreach ($whitelist as $whitelisted) {
+        $whitelisted = trim($whitelisted);
+        if ($whitelisted === '') {
+            continue;
+        }
+        // 允许仅填写域名，自动补全协议便于 parse_url
+        $candidate = (strpos($whitelisted, '://') !== false) ? $whitelisted : ('https://' . $whitelisted);
+        $w_parsed = parse_url($candidate);
+        $w_host_and_path = (isset($w_parsed['host']) ? $w_parsed['host'] : '') . (isset($w_parsed['path']) ? $w_parsed['path'] : '');
+        if ($w_host_and_path === '/') {
+            if ($host_and_path === '/') {
+                return true;
+            }
+        } else {
+            if (strpos($host_and_path, $w_host_and_path) === 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 // 部分代码是不使用的老代码/在部分情况可以触发
 function dmy_link_redirect() {
     // 检查总开关状态
@@ -191,7 +238,28 @@ function dmy_link_redirect() {
         return; // 开关关闭时不处理重定向
     }
 
+
     if (isset($_GET['a'])) {
+        // Referer 防护 禁止站外直接访问跳转页
+        if (!empty($settings['dmy_link_referer_protect'])) {
+            $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
+            $allow_empty = !empty($settings['dmy_link_referer_allow_empty']);
+            $is_safe = ($referer && (dmy_is_same_site_referer($referer) || dmy_is_referer_whitelisted($referer, $settings))) || (!$referer && $allow_empty);
+
+            if (!$is_safe) {
+                $home_url = home_url('/');
+                $back_to_home_button = sprintf(
+                    '<br><br><a href="%s" style="padding: 10px 20px; background-color: #0073aa; color: #fff; text-decoration: none; border-radius: 5px;">返回首页</a>',
+                    esc_url($home_url)
+                );
+                wp_die(
+                    __('危险：禁止站外直接访问跳转页面', 'dmylink') . $back_to_home_button,
+                    __('访问受限', 'dmylink'),
+                    ['response' => 403, 'back_link' => false]
+                );
+            }
+        }
+
         $encrypted_key = sanitize_text_field($_GET['a']);
         $link = get_transient('dmy_link_' . $encrypted_key);
         

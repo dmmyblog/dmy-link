@@ -172,6 +172,29 @@ if( class_exists( 'CSF' ) ) {
                 'default' => bin2hex(openssl_random_pseudo_bytes(16)), // 生成32字符随机密钥
                 'dependency' => array('dmy_link_verification_method', '==', 'aes_encryption'),
             ),
+            array(
+                'id'    => 'dmy_link_referer_protect',
+                'type'  => 'switcher',
+                'title' => '启用 Referer 防护',
+                'desc'  => '开启后，禁止非本站 Referer 直接访问跳转页（/dinterception）',
+                'default' => false,
+            ),
+            array(
+                'id'    => 'dmy_link_referer_allow_empty',
+                'type'  => 'switcher',
+                'title' => '允许空 Referer',
+                'desc'  => '某些浏览器/场景可能不发送 Referer，可选择放行空 Referer',
+                'default' => true,
+                'dependency' => array('dmy_link_referer_protect', '==', 'true'),
+            ),
+            array(
+                'id'    => 'dmy_link_referer_whitelist',
+                'type'  => 'textarea',
+                'title' => 'Referer 白名单（可选）',
+                'desc'  => '每行一个域名或URL（例如 example.com 或 https://sub.example.com）。在启用 Referer 防护时，允许这些来源访问跳转页。',
+                'default' => '',
+                'dependency' => array('dmy_link_referer_protect', '==', 'true'),
+            ),
         ),
     ));
     // 关于插件
