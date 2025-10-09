@@ -33,7 +33,9 @@ if( class_exists( 'CSF' ) ) {
         $options['theme'] = 'light';
     }
     CSF::createOptions( $prefix, $options );
-    // 添加基本设置部分，包含总开关
+    // 资源基址（插件根 URL）
+    $plugin_url = plugin_dir_url( dirname(__DIR__, 2) . '/dmy-link.php' );
+    // 添加基本设置部分，包含总开关与跳转页 slug
     CSF::createSection($prefix, array(
         'title'  => '基本设置',
         'icon' => 'fa fa-cog',
@@ -44,6 +46,13 @@ if( class_exists( 'CSF' ) ) {
                 'title' => '启用插件功能',
                 'desc'  => '关闭后插件所有功能将停止工作',
                 'default' => true, // 默认开启
+            ),
+            array(
+                'id'    => 'dmy_link_slug',
+                'type'  => 'text',
+                'title' => '跳转页路径（Slug）',
+                'desc'  => '用于生成跳转页地址，例如 /dinterception；只允许小写字母、数字和短横线。修改后保存设置会自动刷新固定链接。',
+                'default' => 'dinterception',
             ),
         ),
     ));
@@ -67,23 +76,27 @@ if( class_exists( 'CSF' ) ) {
         'icon' => 'fa fa-paint-brush',
         'fields' => array(
             array(
-                'id'    => 'dmy_link_style',
-                'type'  => 'select',
-                'title' => '提示页面样式',
-                'desc'  => '选择提示页面的样式',
-                'options' => array(
-                    'dmylink-default' => '默认样式',
-                    'dmylink-bilibili' => 'bilibili风格',
-                    'dmylink-tencent' => 'tencent风格',
-                    'dmylink-csdn' => 'csdn风格',
-                    'dmylink-zhihu' => 'zhihu风格',
-                    'dmylink-jump' => 'jump风格',
-                    'dmylink-moxing' => 'moxing风格',
-                    'dmylink-tiktok' => 'tiktok风格',
-
-                ),
-                'default' => 'dmylink-default', // 修正默认值
+                'type' => 'content',
+                'content' => '<style>.csf--image-group{display:flex;flex-wrap:wrap;gap:12px}.csf--image-group .csf--image{margin:0}.csf--image-group .csf--image figure{width:120px;margin:0}.csf--image-group .csf--image img{width:100%;height:auto;border:1px solid #eee;border-radius:6px;display:block}</style>'
             ),
+            array(
+                'id'    => 'dmy_link_style',
+                'type'  => 'image_select',
+                'title' => '提示页面样式',
+                'desc'  => '上方切换样式（点击图片进行选择），下方显示对应的预览图',
+                'options' => array(
+                    'dmylink-default'  => $plugin_url . 'assets/img/dmylink-bilibili.png',
+                    'dmylink-bilibili' => $plugin_url . 'assets/img/dmylink-bilibili.png',
+                    'dmylink-tencent'  => $plugin_url . 'assets/img/dmylink-bilibili.png',
+                    'dmylink-csdn'     => $plugin_url . 'assets/img/dmylink-bilibili.png',
+                    'dmylink-zhihu'    => $plugin_url . 'assets/img/dmylink-bilibili.png',
+                    'dmylink-jump'     => $plugin_url . 'assets/img/dmylink-bilibili.png',
+                    'dmylink-moxing'   => $plugin_url . 'assets/img/dmylink-bilibili.png',
+                    'dmylink-tiktok'   => $plugin_url . 'assets/img/dmylink-bilibili.png',
+                ),
+                'default' => 'dmylink-default',
+                'inline'  => true
+            )
         ),
     ));
 
@@ -176,7 +189,7 @@ if( class_exists( 'CSF' ) ) {
                 'id'    => 'dmy_link_referer_protect',
                 'type'  => 'switcher',
                 'title' => '启用 Referer 防护',
-                'desc'  => '开启后，禁止非本站 Referer 直接访问跳转页（/dinterception）',
+                'desc'  => '开启后，禁止非本站 Referer 直接访问跳转页（例如 /dinterception 或自定义）',
                 'default' => false,
             ),
             array(

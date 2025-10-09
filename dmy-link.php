@@ -87,6 +87,34 @@ function generate_random_string($length = 16) {
     return $random_string . '_' . time();
 }
 
+/**
+ * 跳转页 slug 清洗
+ */
+function dmy_link_sanitize_slug($slug) {
+    $slug = strtolower($slug);
+    $slug = preg_replace('/[^a-z0-9\-]/', '-', $slug);
+    $slug = trim($slug, '-');
+    if ($slug === '') { $slug = 'dinterception'; }
+    return $slug;
+}
+
+/**
+ * 获取跳转页 slug（可在设置中自定义，默认 dinterception）
+ */
+function dmy_link_get_slug() {
+    $settings = get_option('dmy_link_settings');
+    $slug = isset($settings['dmy_link_slug']) ? $settings['dmy_link_slug'] : 'dinterception';
+    return dmy_link_sanitize_slug($slug);
+}
+
+/**
+ * 构造跳转链接（根据自定义 slug 生成）
+ */
+function dmy_link_build_redirect_url($encrypted_key) {
+    $slug = dmy_link_get_slug();
+    return esc_url(home_url('/' . $slug . '?a=' . urlencode($encrypted_key)));
+}
+
 // 拦截所有外部链接并生成跳转Key
 function dmy_link_intercept_links($content) {
     // 检查总开关状态
@@ -119,7 +147,7 @@ function dmy_link_intercept_links($content) {
                     set_transient('dmy_link_' . $encrypted_key, $url, 0);
                 }
                 
-                $newHref = esc_url(home_url('/dinterception?a=' . $encrypted_key));
+                $newHref = dmy_link_build_redirect_url($encrypted_key);
                 
                 // 检查是否已有 target="_blank"
                 if (!preg_match('/target\s*=\s*[\'"][^"\']*_blank[^"\']*[\'"]/i', $afterHref)) {
@@ -307,9 +335,29 @@ add_action('init', 'dmy_link_redirect');
 
 // 添加重定向规则
 function dmy_link_rewrite_rules() {
-    add_rewrite_rule('^dinterception/?$', 'index.php?dinterception=1', 'top');
+    $slug = dmy_link_get_slug();
+    $pattern = '^' . preg_quote($slug, '/') . '/?$';
+    add_rewrite_rule($pattern, 'index.php?dinterception=1', 'top');
 }
 add_action('init', 'dmy_link_rewrite_rules');
+
+register_activation_hook(__FILE__, 'dmy_link_activate');
+function dmy_link_activate() {
+    // 激活时按照当前设置生成重写规则并刷新
+    dmy_link_rewrite_rules();
+    flush_rewrite_rules();
+}
+
+add_action('update_option_dmy_link_settings', 'dmy_link_maybe_flush_on_slug_change', 10, 3);
+function dmy_link_maybe_flush_on_slug_change($old_value, $value, $option) {
+    // 设置保存时，若 slug 发生变化则刷新固定链接
+    $old_slug = isset($old_value['dmy_link_slug']) ? dmy_link_sanitize_slug($old_value['dmy_link_slug']) : 'dinterception';
+    $new_slug = isset($value['dmy_link_slug']) ? dmy_link_sanitize_slug($value['dmy_link_slug']) : 'dinterception';
+    if ($old_slug !== $new_slug) {
+        dmy_link_rewrite_rules();
+        flush_rewrite_rules();
+    }
+}
 
 // 添加查询变量
 function dmy_link_query_vars($vars) {
@@ -358,7 +406,7 @@ function dmylink_ajax_convert() {
         set_transient('dmy_link_' . $encrypted_key, $url, 0);
     }
 
-    wp_send_json_success(array('url' => home_url("/dinterception?a=" . urlencode($encrypted_key))));
+    wp_send_json_success(array('url' => dmy_link_build_redirect_url($encrypted_key)));
 }
 
 
@@ -518,7 +566,7 @@ function dmy_get_redirect_url($url) {
     } else {
         set_transient('dmy_link_' . $encrypted_key, $url, 0); // AES模式永不过期
     }
-    return esc_url(home_url('/dinterception?a=' . $encrypted_key));
+    return dmy_link_build_redirect_url($encrypted_key);
 }
 
 
