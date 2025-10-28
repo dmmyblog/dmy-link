@@ -77,7 +77,7 @@ if( class_exists( 'CSF' ) ) {
         'fields' => array(
             array(
                 'type' => 'content',
-                'content' => '<style>.csf--image-group{display:flex;flex-wrap:wrap;gap:12px}.csf--image-group .csf--image{margin:0}.csf--image-group .csf--image figure{width:120px;margin:0}.csf--image-group .csf--image img{width:100%;height:auto;border:1px solid #eee;border-radius:6px;display:block}</style>'
+                'content' => '<style>.csf--image-group{display:flex;flex-wrap:wrap;gap:12px}.csf--image-group .csf--image{margin:0}.csf--image-group .csf--image figure{width:120px;margin:0}.csf--image-group .csf--image img{width:100%;height:auto;border:1px solid #eee;border-radius:6px;display:block}.csf--image-group .csf--image figcaption{margin-top:6px;font-size:12px;color:#666;text-align:center;line-height:1.2}</style><script>(function(){window.addEventListener("load",function(){var map={"dmylink-default":"默认样式","dmylink-bilibili":"哔哩哔哩","dmylink-tencent":"腾讯云社区","dmylink-csdn":"CSDN","dmylink-zhihu":"知乎","dmylink-jump":"通用跳转","dmylink-moxing":"墨星博客","dmylink-tiktok":"TikTok"};document.querySelectorAll(".csf--image-group .csf--image figure").forEach(function(fig){var input=fig.querySelector("input");if(!input){return}var key=input.value;var label=map[key]||key;if(!fig.querySelector("figcaption")){var cap=document.createElement("figcaption");cap.textContent=label;fig.appendChild(cap)}})});})();</script>'
             ),
             array(
                 'id'    => 'dmy_link_style',
@@ -85,14 +85,14 @@ if( class_exists( 'CSF' ) ) {
                 'title' => '提示页面样式',
                 'desc'  => '上方切换样式（点击图片进行选择），下方显示对应的预览图',
                 'options' => array(
-                    'dmylink-default'  => $plugin_url . 'assets/img/dmylink-bilibili.png',
-                    'dmylink-bilibili' => $plugin_url . 'assets/img/dmylink-bilibili.png',
-                    'dmylink-tencent'  => $plugin_url . 'assets/img/dmylink-bilibili.png',
-                    'dmylink-csdn'     => $plugin_url . 'assets/img/dmylink-bilibili.png',
-                    'dmylink-zhihu'    => $plugin_url . 'assets/img/dmylink-bilibili.png',
-                    'dmylink-jump'     => $plugin_url . 'assets/img/dmylink-bilibili.png',
-                    'dmylink-moxing'   => $plugin_url . 'assets/img/dmylink-bilibili.png',
-                    'dmylink-tiktok'   => $plugin_url . 'assets/img/dmylink-bilibili.png',
+                    'dmylink-default'  => $plugin_url . 'assets/img/default-min.png',
+                    'dmylink-bilibili' => $plugin_url . 'assets/img/bilibili-min.png',
+                    'dmylink-tencent'  => $plugin_url . 'assets/img/tencent-min.png',
+                    'dmylink-csdn'     => $plugin_url . 'assets/img/csdn-min.png',
+                    'dmylink-zhihu'    => $plugin_url . 'assets/img/zhihu-min.png',
+                    'dmylink-jump'     => $plugin_url . 'assets/img/jump-min.png',
+                    'dmylink-moxing'   => $plugin_url . 'assets/img/moxingbk-min.png',
+                    'dmylink-tiktok'   => $plugin_url . 'assets/img/tiktok-min.png',
                 ),
                 'default' => 'dmylink-default',
                 'inline'  => true
