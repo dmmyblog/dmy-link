@@ -4,7 +4,7 @@
  * 
  * @package 大绵羊外链跳转插件
  * @author 大绵羊 & 天无神话
- * @version 1.3.5
+ * @version 1.3.6
  */
 
 // 防止直接访问
@@ -93,8 +93,11 @@ function dmy_link_create_whitelist_section($prefix) {
             [
                 'id'    => 'dmy_link_whitelist',
                 'type'  => 'textarea',
+                'attributes'  => array(
+                    'rows' => 5,
+                ),
                 'title' => '白名单链接',
-                'desc'  => '每行一个链接，不需要加http://或者https://',
+                'desc'  => 'wordpress设置的地址默认为白名单，每行一个链接，不需要加http://或者https://',
                 'default' => '',
             ],
         ],
