@@ -3,25 +3,155 @@
 Plugin Name: 大绵羊外链跳转插件
 Description: 大绵羊外链跳转插件是一个非常实用的WordPress插件，它可以对文章中的外链进行过滤，有效地防止追踪和提醒用户。
 Version: 1.3.5
-Author: 大绵羊&天无神话
+Author: Author: 大绵羊&天无神话
 Author URI: https://dmyblog.cn
 */
 
-// 定义插件URL常量
-if (!defined('DMY_LINK_URL')) {
-    define('DMY_LINK_URL', plugin_dir_url(__FILE__));
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// 插件统一版本
+function dmy_link_plugin_version()
+{
+    return "1.3.5";
+}
+$version = dmy_link_plugin_version();
+
+// 定义插件路径常量
+define('DMY_LINK_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('DMY_LINK_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('DMY_LINK_URL', DMY_LINK_PLUGIN_URL);
+
+// 判断当前主题是否是zibll主题或其子主题
+function is_zibll_themes()
+{
+// 获取当前主题对象
+    $current_theme = wp_get_theme();
+
+// 检测当前主题是否是zibll主主题
+    if ($current_theme->get_stylesheet() === "zibll") {
+        return true;
+    }
+
+// 检测当前主题是否是zibll的子主题（父主题为zibll）
+    if ($current_theme->get("Template") === "zibll") {
+        return true;
+    }
+
+    // Neither // 都不是
+    return false;
+}
+
+// 初始化所有功能
+function dmy_link_init_functions() {
+    // 全局配置变量
+    global $dmy_link_config;
+    $dmy_link_config = get_option("dmy_link_settings", []);
+    
+    // 记录CSF初始化状态的变量
+    $csf_initialized = false;
+
+    // 初始化CSF设置面板
+    if (class_exists("CSF")) {
+        $csf_initialized = dmy_link_init_csf_settings();
+    } else {
+        $csf_initialized = false;
+    }
+
+    // 添加备用菜单注册方式，确保在CSF无法正常工作时仍能显示插件入口
+    if (!$csf_initialized) {
+        if (!is_zibll_themes()) {
+            add_action("admin_menu", "dmy_link_add_fallback_menu");
+        }
+    }
+}
+add_action('init', 'dmy_link_init_functions');
+
+// CSF设置文件加载逻辑
+if (is_zibll_themes()) {
+    // 使用子比函数挂载
+    require_once DMY_LINK_PLUGIN_DIR . "codestar-framework/admin-settings/dmylink-settings.php";
+    add_action("zib_require_end", "dmy_link_settings");
+} else {
+    // 非子比引入必要文件
+    $required_files = [
+        "/codestar-framework/codestar-framework.php",
+        "/codestar-framework/admin-settings/dmylink-settings.php",
+    ];
+
+    // 检查Codestar Framework是否已存在
+    $csf_exists = class_exists("CSF");
+    foreach ($required_files as $file) {
+        $full_path = DMY_LINK_PLUGIN_DIR . $file;
+        // 如果是Codestar框架文件且已存在，则跳过加载
+        if (
+            $file === "/codestar-framework/codestar-framework.php" &&
+            $csf_exists
+        ) {
+            continue;
+        }
+        // 加载其他文件
+        if (file_exists($full_path)) {
+            require_once $full_path;
+        } else {
+            error_log("大绵羊外链插件错误：缺少必要文件 - " . $full_path);
+        }
+    }
+}
+
+// 备用菜单函数
+function dmy_link_add_fallback_menu() {
+    add_menu_page(
+        "大绵羊外链跳转设置",
+        "外链跳转",
+        "manage_options",
+        "dmy_link_fallback",
+        "dmy_link_fallback_page",
+        "dashicons-admin-links",
+        58
+    );
+}
+
+function dmy_link_fallback_page() {
+    if (!current_user_can("manage_options")) {
+        wp_die("您没有足够的权限访问此页面。");
+    }
+
+    $csf_loaded = class_exists("CSF") ? "已加载" : "未加载";
+    echo '<div class="wrap">';
+    echo "<h1>大绵羊外链跳转设置</h1>";
+    echo '<div class="notice notice-warning">';
+    echo "<p>检测到配置面板框架未正常加载，可能是文件缺失或损坏。</p>";
+    echo "<p>CSF框架状态: " . esc_html($csf_loaded) . "</p>";
+    echo "<p>请检查 <code>codestar-framework/</code> 文件夹是否存在且完整。</p>";
+    echo "<p>如果问题持续存在，请重新安装插件。</p>";
+    echo "</div>";
+    echo "</div>";
+}
+
+// 初始化CSF设置
+function dmy_link_init_csf_settings() {
+    // 只有后台才执行此代码
+    if (!is_admin()) {
+        return false;
+    }
+    
+    // 检查CSF是否可用
+    if (!class_exists('CSF')) {
+        return false;
+    }
+    
+    // 调用设置函数
+    if (function_exists('dmy_link_settings')) {
+        dmy_link_settings();
+        return true;
+    }
+    
+    return false;
 }
 
 
-// 引入 Codestar Framework 进行插件设置
-// 检查Codestar Framework是否已加载
-// if ( ! function_exists( 'cs_framework_init' ) ) {
-//     require_once plugin_dir_path(__FILE__) . 'codestar-framework/codestar-framework.php';
-// }
-
-require_once plugin_dir_path(__FILE__) . 'codestar-framework/admin-settings/dmylink-settings.php';
-// require_once plugin_dir_path(__FILE__) . 'codestar-framework/codestar-framework.php';
-// require_once plugin_dir_path(__FILE__) . 'codestar-framework/admin-settings/dmylink-settings.php';
 
 // 加载 CSS 样式
 function dmy_link_enqueue_styles() {
@@ -294,7 +424,7 @@ function dmy_link_redirect() {
         
         // 修复URL传输中+号被转换为空格的问题
             $encrypted_key = str_replace(' ', '+', $encrypted_key);
-            error_log('修复后的Encrypted Key: ' . $encrypted_key);
+            error_log('Encrypted Key: ' . $encrypted_key);
         // 尝试AES解密（如果是AES加密的链接）
         if (!$link) {
             $settings = get_option('dmy_link_settings');
@@ -475,14 +605,6 @@ function dmy_link_uninstall() {
 }
 register_uninstall_hook(__FILE__, 'dmy_link_uninstall');
 
-// 判断子比主题是否存在
-function is_zibll_themes() {
-    // 构建 zibll 主题 style.css 的绝对路径
-    $style_file_path = WP_CONTENT_DIR . '/themes/zibll/style.css';
-    
-    // 检测文件是否存在且为文件（排除目录）
-    return file_exists($style_file_path) && is_file($style_file_path);
-}
 
 // 适配子比主题：接管评论链接和用户中心重定向
 if (is_zibll_themes()) {
