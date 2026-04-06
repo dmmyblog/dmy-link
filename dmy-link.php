@@ -125,7 +125,7 @@ function dmy_link_add_fallback_menu() {
         "dmy_link_fallback",
         "dmy_link_fallback_page",
         "dashicons-admin-links",
-        58
+        59
     );
 }
 

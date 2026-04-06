@@ -34,7 +34,7 @@ function dmy_link_settings() {
         'menu_slug'       => $prefix,
         'menu_type'       => 'menu',
         'menu_icon'       => 'dashicons-admin-links',
-        'menu_position'   => 58,
+        'menu_position'   => 59,
         'framework_title' => '大绵羊外链跳转插件 <small style="color: #fff;">v'.$version.'</small>',
         'footer_text'     => '<style>html body .csf-theme-light .csf-header-inner::before { content: "DMY" !important; }</style>作者：大绵羊&天无神话 | 作者网站：<a href="https://dmyblog.cn" target="_blank">大绵羊博客</a> <a href="https://wxsnote.cn" target="_blank">王先生笔记</a> | 版本:V'.$version,
         'show_bar_menu'   => false,
