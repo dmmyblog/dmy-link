@@ -2,7 +2,7 @@
 /*
 Plugin Name: 大绵羊外链跳转插件
 Description: 大绵羊外链跳转插件是一个非常实用的WordPress插件，它可以对文章中的外链进行过滤，有效地防止追踪和提醒用户。
-Version: 1.3.7
+Version: 1.4.0
 Author:  大绵羊
 Author URI: https://dmyblog.cn
 */
@@ -30,7 +30,7 @@ if (!defined('ABSPATH')) {
 // 插件统一版本
 function dmy_link_plugin_version()
 {
-    return "1.3.7";
+    return "1.4.0";
 }
 $version = dmy_link_plugin_version();
 
@@ -38,6 +38,10 @@ $version = dmy_link_plugin_version();
 define('DMY_LINK_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DMY_LINK_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('DMY_LINK_URL', DMY_LINK_PLUGIN_URL);
+
+// 加载 GitHub Releases 自动更新
+require_once DMY_LINK_PLUGIN_DIR . 'src/Update/GitHubReleaseUpdater.php';
+DmyLink_GitHubReleaseUpdater::init(__FILE__, dmy_link_plugin_version());
 
 // 判断当前主题是否是zibll主题或其子主题
 function is_zibll_themes()
@@ -148,6 +152,11 @@ function dmy_link_fallback_page() {
 
 // 初始化CSF设置
 function dmy_link_init_csf_settings() {
+    // 子比主题下由 zib_require_end 钩子负责调用，这里跳过避免重复
+    if (is_zibll_themes()) {
+        return false;
+    }
+
     // 只有后台才执行此代码
     if (!is_admin()) {
         return false;
@@ -228,7 +237,7 @@ function generate_random_string($length = 16) {
     $characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     $random_string = '';
     for ($i = 0; $i < $length; $i++) {
-        $random_string .= $characters[rand(0, strlen($characters) - 1)];
+        $random_string .= $characters[wp_rand(0, strlen($characters) - 1)];
     }
     return $random_string . '_' . time();
 }
@@ -271,7 +280,7 @@ function dmy_link_intercept_links($content) {
 
     return preg_replace_callback(
         '/<a\s+([^>]*?)href="([^"]*)"([^>]*?)>/i', 
-        function($matches) {
+        function($matches) use ($settings) {
             $url = $matches[2];
             $beforeHref = $matches[1];
             $afterHref = $matches[3];
@@ -279,7 +288,6 @@ function dmy_link_intercept_links($content) {
             // 检查是否是内部链接或白名单链接
             if (!is_internal_link($url) && !is_whitelisted_link($url, 'dmy_link_settings')) {
                 $encrypted_key = dmy_link_encrypt_url($url);
-                $settings = get_option('dmy_link_settings');
                 
                 // 根据加密方式设置过期时间
                 $method = isset($settings['dmy_link_verification_method']) ? $settings['dmy_link_verification_method'] : 'random_string';
@@ -422,7 +430,7 @@ function dmy_link_redirect() {
     if (isset($_GET['a'])) {
         // Referer 防护 禁止站外直接访问跳转页
         if (!empty($settings['dmy_link_referer_protect'])) {
-            $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
+            $referer = isset($_SERVER['HTTP_REFERER']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_REFERER'])) : '';
             $allow_empty = !empty($settings['dmy_link_referer_allow_empty']);
             $is_safe = ($referer && (dmy_is_same_site_referer($referer) || dmy_is_referer_whitelisted($referer, $settings))) || (!$referer && $allow_empty);
 
@@ -440,7 +448,7 @@ function dmy_link_redirect() {
             }
         }
 
-        $encrypted_key = sanitize_text_field($_GET['a']);
+        $encrypted_key = sanitize_text_field(wp_unslash($_GET['a']));
         $link = get_transient('dmy_link_' . $encrypted_key);
         
         
@@ -530,13 +538,22 @@ add_action('wp_ajax_dmylink_convert', 'dmylink_ajax_convert');
 add_action('wp_ajax_nopriv_dmylink_convert', 'dmylink_ajax_convert');
 
 function dmylink_ajax_convert() {
+    // 此接口为公开URL加密服务（非状态修改操作），同时注册了 nopriv
+    // Nginx 缓存环境下 PHP 输出的 nonce 会过期，因此不使用 check_ajax_referer
+    // 改用 Referer 检查防止外部站点滥用
+    $referer = isset($_SERVER['HTTP_REFERER']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_REFERER'])) : '';
+    $home_url = home_url();
+    if ($referer && strpos($referer, $home_url) !== 0) {
+        wp_send_json_error(array('message' => '非法请求'));
+    }
+
     // 检查总开关状态
     $settings = get_option('dmy_link_settings');
     if (empty($settings['dmy_link_enable'])) {
         wp_send_json_error(array('message' => '插件已关闭'));
     }
 
-    $url = isset($_POST['url']) ? esc_url_raw($_POST['url']) : '';
+    $url = isset($_POST['url']) ? esc_url_raw(wp_unslash($_POST['url'])) : '';
 
     // 站内或白名单直接放行
     if (is_internal_link($url) || is_whitelisted_link($url, 'dmy_link_settings')) {
@@ -629,15 +646,51 @@ register_uninstall_hook(__FILE__, 'dmy_link_uninstall');
 
 
 // 适配子比主题：接管评论链接和用户中心重定向
+// 必须在 zib_require_end 中执行，此时主题及自定义函数均已注册完毕
 if (is_zibll_themes()) {
-    // 卸载主题的评论链接重定向钩子
+    add_action('zib_require_end', 'dmy_link_override_zibll_filters', 99);
+}
+
+/**
+ * 在主题加载完毕后，移除主题原版及自定义版的评论/用户模态框处理器，替换为插件版
+ * 同时强制关闭子比主题的外链重定向功能，避免与插件冲突
+ */
+function dmy_link_override_zibll_filters() {
+    // 强制关闭子比主题的外链重定向和外链重定向鉴权
+    // _pz() 使用静态缓存无法从外部重置，因此同时用 _spz() 写入 option 确保下次请求生效
+    if (_pz('go_link_s')) {
+        _spz('go_link_s', false);
+    }
+    if (_pz('go_link_nonce_s')) {
+        _spz('go_link_nonce_s', false);
+    }
+
+    // 移除主题原版评论链接处理
     remove_filter('get_comment_author_link', 'add_redirect_comment_link', 5);
     remove_filter('comment_text', 'add_redirect_comment_link', 99);
-    remove_action('wp_ajax_user_details_data_modal', 'zib_ajax_user_details_data_modal');
-    remove_action('wp_ajax_nopriv_user_details_data_modal', 'zib_ajax_user_details_data_modal');
-    // 挂载插件的评论链接重定向钩子（优先级高于主题）
+    // 移除主题自定义版（zidingyi 中可能注册的）
+    remove_filter('get_comment_author_link', 'wxs_add_redirect_comment_link', 5);
+    remove_filter('comment_text', 'wxs_add_redirect_comment_link', 99);
+
+    // 移除子比主题 the_content 中的外链处理
+    remove_filter('the_content', 'the_content_nofollow', 999);
+    // 移除自定义版 the_content 外链处理
+    if (function_exists('wxs_the_content_nofollow')) {
+        remove_filter('the_content', 'wxs_the_content_nofollow', 999);
+    }
+
+    // 注册插件版评论链接处理
     add_filter('get_comment_author_link', 'dmy_add_redirect_comment_link', 6);
     add_filter('comment_text', 'dmy_add_redirect_comment_link', 100);
+
+    // 移除主题原版用户详情模态框
+    remove_action('wp_ajax_user_details_data_modal', 'zib_ajax_user_details_data_modal');
+    remove_action('wp_ajax_nopriv_user_details_data_modal', 'zib_ajax_user_details_data_modal');
+    // 移除主题自定义版用户详情模态框
+    remove_action('wp_ajax_user_details_data_modal', 'wxs_zib_ajax_user_details_data_modal');
+    remove_action('wp_ajax_nopriv_user_details_data_modal', 'wxs_zib_ajax_user_details_data_modal');
+
+    // 注册插件版用户详情模态框
     add_action('wp_ajax_user_details_data_modal', 'dmy_zib_ajax_user_details_data_modal');
     add_action('wp_ajax_nopriv_user_details_data_modal', 'dmy_zib_ajax_user_details_data_modal');
 }
@@ -658,10 +711,20 @@ function dmy_add_redirect_comment_link($text = '') {
 
 /**
  * 插件的链接处理逻辑（替代主题的go_link）
+ * @param string $text 链接文本或含<a>标签的HTML
+ * @param bool $link 为true时视为纯URL，直接返回跳转后的URL
  */
-function dmy_go_link($text = '') {
+function dmy_go_link($text = '', $link = false) {
     $settings = get_option('dmy_link_settings');
     if (empty($settings['dmy_link_enable'])) {
+        return $text;
+    }
+
+    // 纯链接模式：直接返回跳转URL或原URL
+    if ($link) {
+        if (!is_internal_link($text) && !is_whitelisted_link($text, 'dmy_link_settings')) {
+            return dmy_get_redirect_url($text);
+        }
         return $text;
     }
 
@@ -717,11 +780,11 @@ function dmy_get_redirect_url($url) {
 //查看用户全部详细资料的模态框
 function dmy_zib_ajax_user_details_data_modal()
 {
-    $user_id = !empty($_REQUEST['id']) ? $_REQUEST['id'] : '';
+    $user_id = !empty($_REQUEST['id']) ? absint(wp_unslash($_REQUEST['id'])) : 0;
 
     $user = get_userdata($user_id);
     if (!$user_id || empty($user->ID)) {
-        zib_ajax_notice_modal('danger', '用户不存在或参数传入错误');
+        zib_ajax_notice_modal('danger', __('用户不存在或参数传入错误', 'zib_language'));
     }
 
     echo dmy_zib_get_user_details_data_modal($user_id);
@@ -746,60 +809,60 @@ function dmy_zib_get_user_details_data_modal($user_id = '', $class = 'mb10 flex'
 
     $datas = array(
         array(
-            'title'   => '签名',
+            'title'   => __('签名', 'zib_language'),
             'value'   => get_user_desc($user_id, false),
-            'spare'   => '未知',
+            'spare'   => __('未知', 'zib_language'),
             'no_show' => false,
         ),
         array(
-            'title'   => '注册时间',
+            'title'   => __('注册时间', 'zib_language'),
             'value'   => get_date_from_gmt($udata->user_registered),
-            'spare'   => '未知',
+            'spare'   => __('未知', 'zib_language'),
             'no_show' => false,
         ), array(
-            'title'   => '最后登录',
+            'title'   => __('最后登录', 'zib_language'),
             'value'   => get_user_meta($user_id, 'last_login', true),
-            'spare'   => '未知',
+            'spare'   => __('未知', 'zib_language'),
             'no_show' => false,
         ), array(
-            'title'   => '邮箱',
+            'title'   => __('邮箱', 'zib_language'),
             'value'   => esc_attr($udata->user_email),
-            'spare'   => '未知',
+            'spare'   => __('未知', 'zib_language'),
             'no_show' => true,
         ), array(
-            'title'   => '性别',
+            'title'   => __('性别', 'zib_language'),
             'value'   => esc_attr(get_user_meta($user_id, 'gender', true)),
-            'spare'   => '保密',
+            'spare'   => __('保密', 'zib_language'),
             'no_show' => true,
         ), array(
-            'title'   => '地址',
+            'title'   => __('地址', 'zib_language'),
             'value'   => esc_textarea(zib_get_user_meta($user_id, 'address', true)),
-            'spare'   => '未知',
+            'spare'   => __('未知', 'zib_language'),
             'no_show' => true,
         ), array(
-            'title'   => '个人网站',
+            'title'   => __('个人网站', 'zib_language'),
             'value'   => dmy_zib_get_url_link($user_id), //修改
-            'spare'   => '未知',
+            'spare'   => __('未知', 'zib_language'),
             'no_show' => true,
         ), array(
             'title'   => 'QQ',
             'value'   => esc_attr(zib_get_user_meta($user_id, 'qq', true)),
-            'spare'   => '未知',
+            'spare'   => __('未知', 'zib_language'),
             'no_show' => true,
         ), array(
-            'title'   => '微信',
+            'title'   => __('微信', 'zib_language'),
             'value'   => esc_attr(zib_get_user_meta($user_id, 'weixin', true)),
-            'spare'   => '未知',
+            'spare'   => __('未知', 'zib_language'),
             'no_show' => true,
         ), array(
-            'title'   => '微博',
+            'title'   => __('微博', 'zib_language'),
             'value'   => esc_url(zib_get_user_meta($user_id, 'weibo', true)),
-            'spare'   => '未知',
+            'spare'   => __('未知', 'zib_language'),
             'no_show' => true,
         ), array(
             'title'   => 'Github',
             'value'   => esc_url(zib_get_user_meta($user_id, 'github', true)),
-            'spare'   => '未知',
+            'spare'   => __('未知', 'zib_language'),
             'no_show' => true,
         ),
     );
@@ -809,9 +872,9 @@ function dmy_zib_get_user_details_data_modal($user_id = '', $class = 'mb10 flex'
     //用户认证
     if (_pz('user_auth_s', true)) {
         $auth_name = zib_get_user_auth_info_link($user_id, 'c-blue');
-        $auth_name = $auth_name ? $auth_name : '未认证';
+        $auth_name = $auth_name ? $auth_name : __('未认证', 'zib_language');
         $lists .= '<div class="' . $class . '" style="min-width: 50%;">';
-        $lists .= '<div class="author-set-left ' . $t_class . '" style="min-width: 80px;">认证</div>';
+        $lists .= '<div class="author-set-left ' . $t_class . '" style="min-width: 80px;">' . __('认证', 'zib_language') . '</div>';
         $lists .= '<div class="author-set-right mt6' . $v_class . '">' . $auth_name . '</div>';
         $lists .= '</div>';
     }
@@ -819,10 +882,10 @@ function dmy_zib_get_user_details_data_modal($user_id = '', $class = 'mb10 flex'
     //用户徽章
     if (_pz('user_medal_s', true)) {
         $user_medal = zib_get_user_medal_show_link($user_id, '', 5);
-        $user_medal = $user_medal ? $user_medal : '暂无徽章';
+        $user_medal = $user_medal ? $user_medal : __('暂无徽章', 'zib_language');
 
         $lists .= '<div class="' . $class . '" style="min-width: 50%;">';
-        $lists .= '<div class="author-set-left ' . $t_class . '" style="min-width: 80px;">徽章</div>';
+        $lists .= '<div class="author-set-left ' . $t_class . '" style="min-width: 80px;">' . __('徽章', 'zib_language') . '</div>';
         $lists .= '<div class="author-set-right mt6' . $v_class . '">' . $user_medal . '</div>';
         $lists .= '</div>';
     }
@@ -830,7 +893,7 @@ function dmy_zib_get_user_details_data_modal($user_id = '', $class = 'mb10 flex'
     foreach ($datas as $data) {
         if (!is_super_admin() && $data['no_show'] && 'public' != $privacy && $current_id != $user_id) {
             if (('just_logged' == $privacy && !$current_id) || 'just_logged' != $privacy) {
-                $data['value'] = '用户未公开';
+                $data['value'] = __('用户未公开', 'zib_language');
             }
         }
         $lists .= '<div class="' . $class . '" style="min-width: 50%;">';

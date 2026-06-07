@@ -4,7 +4,7 @@
  * 
  * @package 大绵羊外链跳转插件
  * @author 大绵羊 & 天无神话
- * @version 1.3.6
+ * @version 1.4.0
  */
 
 // 防止直接访问
@@ -59,26 +59,55 @@ function dmy_link_settings() {
  * 创建基本设置面板
  */
 function dmy_link_create_basic_section($prefix) {
+    $fields = [];
+
+    // 子比主题环境下显示冲突提示
+    if (is_zibll_themes()) {
+        $go_link_s = _pz('go_link_s');
+        $go_link_nonce_s = _pz('go_link_nonce_s');
+        $needs_fix = !empty($go_link_s) || !empty($go_link_nonce_s);
+
+        $notice_type = $needs_fix ? 'warning' : 'info';
+        $notice_content = '<strong>检测到子比主题环境</strong><br>';
+        if ($needs_fix) {
+            $notice_content .= '<span style="color:#d63638;">子比主题的「外链重定向」或「外链重定向鉴权」已开启，会与插件冲突导致外链无法正确跳转。插件已在运行时自动接管，但建议前往 <a href="' . esc_url(admin_url('admin.php?page=zibll_options#外链重定向')) . '">子比主题设置</a> 关闭以下选项：</span>';
+            if (!empty($go_link_s)) {
+                $notice_content .= '<br>• <strong>外链重定向</strong>（go_link_s）— 当前：开启 → 建议关闭';
+            }
+            if (!empty($go_link_nonce_s)) {
+                $notice_content .= '<br>• <strong>外链重定向鉴权</strong>（go_link_nonce_s）— 当前：开启 → 建议关闭';
+            }
+        } else {
+            $notice_content .= '<span style="color:#0073aa;">子比主题的「外链重定向」和「外链重定向鉴权」均已关闭，插件可正常工作。</span>';
+        }
+
+        $fields[] = [
+            'type'    => 'notice',
+            'style'   => $notice_type,
+            'content' => $notice_content,
+        ];
+    }
+
+    $fields[] = [
+        'id'      => 'dmy_link_enable',
+        'type'    => 'switcher',
+        'title'   => '启用插件功能',
+        'label'   => '关闭后插件所有功能将停止工作',
+        'default' => true,
+    ];
+    $fields[] = [
+        'id'      => 'dmy_link_slug',
+        'type'    => 'text',
+        'title'   => '跳转页路径（Slug）',
+        'desc'    => '用于生成跳转页地址，例如 /dinterception；只允许小写字母、数字和短横线。修改后保存设置会自动刷新固定链接。',
+        'default' => 'dinterception',
+        'sanitize' => 'dmy_link_sanitize_slug',
+    ];
+
     CSF::createSection($prefix, [
         'title'  => '基本设置',
         'icon'   => 'fa fa-cog',
-        'fields' => [
-            [
-                'id'      => 'dmy_link_enable',
-                'type'    => 'switcher',
-                'title'   => '启用插件功能',
-                'label'   => '关闭后插件所有功能将停止工作',
-                'default' => true,
-            ],
-            [
-                'id'      => 'dmy_link_slug',
-                'type'    => 'text',
-                'title'   => '跳转页路径（Slug）',
-                'desc'    => '用于生成跳转页地址，例如 /dinterception；只允许小写字母、数字和短横线。修改后保存设置会自动刷新固定链接。',
-                'default' => 'dinterception',
-                'sanitize' => 'dmy_link_sanitize_slug',
-            ],
-        ],
+        'fields' => $fields,
     ]);
 }
 
@@ -310,7 +339,7 @@ function dmy_link_create_about_section($prefix) {
                 'style'   => 'warning',
                 'content' => '作者：大绵羊&天无神话<br/>
                              共同开发：天无神话(<a href="https://wxsnote.cn" target="_blank">王先生笔记</a>)<br/>
-                             作者网站：<a href="https://dmyblog.cn" target="_blank">大绵羊博客</a><br/>'
+                             作者博客：大绵羊(<a href="https://dmyblog.cn" target="_blank">大绵羊博客</a>)<br/>'
             ],
             [
                 'type'    => 'notice',
