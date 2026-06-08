@@ -92,7 +92,7 @@ add_action('init', 'dmy_link_init_functions');
 if (is_zibll_themes()) {
     // 使用子比函数挂载
     require_once DMY_LINK_PLUGIN_DIR . "codestar-framework/admin-settings/dmylink-settings.php";
-    add_action("zib_require_end", "dmy_link_settings");
+    add_action("after_setup_theme", "dmy_link_settings");
 } else {
     // 非子比引入必要文件
     $required_files = [
@@ -152,7 +152,7 @@ function dmy_link_fallback_page() {
 
 // 初始化CSF设置
 function dmy_link_init_csf_settings() {
-    // 子比主题下由 zib_require_end 钩子负责调用，这里跳过避免重复
+    // 子比主题下由 after_setup_theme 钩子负责调用，这里跳过避免重复
     if (is_zibll_themes()) {
         return false;
     }
@@ -646,9 +646,9 @@ register_uninstall_hook(__FILE__, 'dmy_link_uninstall');
 
 
 // 适配子比主题：接管评论链接和用户中心重定向
-// 必须在 zib_require_end 中执行，此时主题及自定义函数均已注册完毕
+// 必须在 after_setup_theme 中执行，此时主题及自定义函数均已注册完毕
 if (is_zibll_themes()) {
-    add_action('zib_require_end', 'dmy_link_override_zibll_filters', 99);
+    add_action('after_setup_theme', 'dmy_link_override_zibll_filters', 99);
 }
 
 /**
