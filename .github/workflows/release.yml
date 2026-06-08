@@ -1,0 +1,66 @@
+name: Build Release Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release-zip:
+    name: Build plugin ZIP
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION=$(grep -E "^[[:space:]]*Version:" dmy-link.php | head -n 1 | awk -F ':' '{print $2}' | xargs)
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "zip_name=dmy-link-${VERSION}.zip" >> "${GITHUB_OUTPUT}"
+
+      - name: Prepare package directory
+        shell: bash
+        run: |
+          rm -rf build dmy-link *.zip
+          mkdir -p build/dmy-link
+          rsync -av \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='build' \
+            --exclude='.DS_Store' \
+            --exclude='*.zip' \
+            ./ build/dmy-link/
+
+      - name: Create ZIP
+        shell: bash
+        run: |
+          cd build
+          zip -r "../${{ steps.version.outputs.zip_name }}" dmy-link
+          cd ..
+          ls -lh "${{ steps.version.outputs.zip_name }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.zip_name }}
+          path: ${{ steps.version.outputs.zip_name }}
+
+      - name: Attach ZIP to GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.version.outputs.zip_name }}
+          generate_release_notes: true
