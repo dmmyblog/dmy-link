@@ -5,6 +5,7 @@ Description: 大绵羊外链跳转插件是一个非常实用的WordPress插件�
 Version: 1.4.0
 Author:  大绵羊
 Author URI: https://dmyblog.cn
+Plugin URI: https://github.com/dmmyblog/dmy-link
 */
 
 
