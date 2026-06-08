@@ -5,6 +5,7 @@ Description: 大绵羊外链跳转插件是一个非常实用的WordPress插件�
 Version: 1.4.0
 Author:  大绵羊
 Author URI: https://dmyblog.cn
+Plugin URI: https://github.com/dmmyblog/dmy-link
 */
 
 
@@ -304,7 +305,7 @@ function dmy_link_intercept_links($content) {
                 $newHref = dmy_link_build_redirect_url($encrypted_key);
                 
                 // 检查是否已有 target="_blank"
-                if (!preg_match('/target\s*=\s*[\'"][^"\']*_blank[^"\']*[\'"]/i', $afterHref)) {
+                if (!preg_match('/target\s*=\s*[\'\"][^"\']*_blank[^"\']*[\'\"]/i', $afterHref)) {
                     $afterHref .= ' target="_blank"';
                 }
                 
@@ -312,7 +313,7 @@ function dmy_link_intercept_links($content) {
             }
             
             // 检查原始链接是否已有 target="_blank"
-            if (!preg_match('/target\s*=\s*[\'"][^"\']*_blank[^"\']*[\'"]/i', $afterHref)) {
+            if (!preg_match('/target\s*=\s*[\'\"][^"\']*_blank[^"\']*[\'\"]/i', $afterHref)) {
                 $afterHref .= ' target="_blank"';
             }
             
@@ -375,6 +376,14 @@ function is_whitelisted_link($url, $option_name) {
 //
 // Referer 防护辅助函数
 //
+function dmy_link_get_request_referer() {
+    if (empty($_SERVER['HTTP_REFERER']) || is_array($_SERVER['HTTP_REFERER'])) {
+        return '';
+    }
+
+    return esc_url_raw(wp_unslash($_SERVER['HTTP_REFERER']));
+}
+
 function dmy_is_same_site_referer($referer) {
     if (empty($referer)) {
         return false;
@@ -418,6 +427,22 @@ function dmy_is_referer_whitelisted($referer, $settings) {
     return false;
 }
 
+function dmy_link_is_allowed_referer($referer, $settings, $allow_empty = false) {
+    if (empty($referer)) {
+        return (bool) $allow_empty;
+    }
+
+    return dmy_is_same_site_referer($referer) || dmy_is_referer_whitelisted($referer, $settings);
+}
+
+function dmy_link_get_ajax_url_from_request() {
+    if (empty($_POST['url']) || is_array($_POST['url'])) {
+        return '';
+    }
+
+    return esc_url_raw(wp_unslash($_POST['url']));
+}
+
 // 部分代码是不使用的老代码/在部分情况可以触发
 function dmy_link_redirect() {
     // 检查总开关状态
@@ -430,9 +455,9 @@ function dmy_link_redirect() {
     if (isset($_GET['a'])) {
         // Referer 防护 禁止站外直接访问跳转页
         if (!empty($settings['dmy_link_referer_protect'])) {
-            $referer = isset($_SERVER['HTTP_REFERER']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_REFERER'])) : '';
+            $referer = dmy_link_get_request_referer();
             $allow_empty = !empty($settings['dmy_link_referer_allow_empty']);
-            $is_safe = ($referer && (dmy_is_same_site_referer($referer) || dmy_is_referer_whitelisted($referer, $settings))) || (!$referer && $allow_empty);
+            $is_safe = dmy_link_is_allowed_referer($referer, $settings, $allow_empty);
 
             if (!$is_safe) {
                 $home_url = home_url('/');
@@ -448,16 +473,14 @@ function dmy_link_redirect() {
             }
         }
 
-        $encrypted_key = sanitize_text_field(wp_unslash($_GET['a']));
+        $raw_key = (isset($_GET['a']) && !is_array($_GET['a'])) ? wp_unslash($_GET['a']) : '';
+        $encrypted_key = sanitize_text_field($raw_key);
+        // 修复 URL 传输中 + 号被转换为空格的问题：必须先还原，再读取 transient / AES 解密
+        $encrypted_key = str_replace(' ', '+', $encrypted_key);
         $link = get_transient('dmy_link_' . $encrypted_key);
-        
-        
-        // 修复URL传输中+号被转换为空格的问题
-            $encrypted_key = str_replace(' ', '+', $encrypted_key);
-            error_log('Encrypted Key: ' . $encrypted_key);
+
         // 尝试AES解密（如果是AES加密的链接）
         if (!$link) {
-            $settings = get_option('dmy_link_settings');
             if (isset($settings['dmy_link_verification_method']) && 
                 $settings['dmy_link_verification_method'] === 'aes_encryption' &&
                 !empty($settings['dmy_link_aes_key'])) {
@@ -465,8 +488,10 @@ function dmy_link_redirect() {
                 $key = $settings['dmy_link_aes_key'];
                 // 使用密钥派生固定IV（与加密过程一致）
                 $iv = substr(hash('sha256', $key, true), 0, 16);
-                $encrypted = base64_decode($encrypted_key);
-                $link = openssl_decrypt($encrypted, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+                $encrypted = base64_decode($encrypted_key, true);
+                if (false !== $encrypted) {
+                    $link = openssl_decrypt($encrypted, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+                }
             }
         }
 
@@ -541,19 +566,21 @@ function dmylink_ajax_convert() {
     // 此接口为公开URL加密服务（非状态修改操作），同时注册了 nopriv
     // Nginx 缓存环境下 PHP 输出的 nonce 会过期，因此不使用 check_ajax_referer
     // 改用 Referer 检查防止外部站点滥用
-    $referer = isset($_SERVER['HTTP_REFERER']) ? esc_url_raw(wp_unslash($_SERVER['HTTP_REFERER'])) : '';
-    $home_url = home_url();
-    if ($referer && strpos($referer, $home_url) !== 0) {
-        wp_send_json_error(array('message' => '非法请求'));
+    $settings = get_option('dmy_link_settings');
+    $referer = dmy_link_get_request_referer();
+    if (!dmy_link_is_allowed_referer($referer, $settings, false)) {
+        wp_send_json_error(array('message' => __('非法请求', 'dmylink')), 403);
     }
 
     // 检查总开关状态
-    $settings = get_option('dmy_link_settings');
     if (empty($settings['dmy_link_enable'])) {
-        wp_send_json_error(array('message' => '插件已关闭'));
+        wp_send_json_error(array('message' => __('插件已关闭', 'dmylink')));
     }
 
-    $url = isset($_POST['url']) ? esc_url_raw(wp_unslash($_POST['url'])) : '';
+    $url = dmy_link_get_ajax_url_from_request();
+    if (empty($url) || !wp_http_validate_url($url)) {
+        wp_send_json_error(array('message' => __('链接参数无效', 'dmylink')), 400);
+    }
 
     // 站内或白名单直接放行
     if (is_internal_link($url) || is_whitelisted_link($url, 'dmy_link_settings')) {
@@ -562,7 +589,6 @@ function dmylink_ajax_convert() {
 
     // 使用统一加密函数
     $encrypted_key = dmy_link_encrypt_url($url);
-    $settings = get_option('dmy_link_settings');
     
     // 根据加密方式设置过期时间
     $method = isset($settings['dmy_link_verification_method']) ? $settings['dmy_link_verification_method'] : 'random_string';
@@ -611,7 +637,7 @@ add_action( 'wp_enqueue_scripts', function () {
             'dmylink-circle',
             plugin_dir_url( __FILE__ ) . 'js/dmylink-circle.js',
             array(),            
-            '1.0.1',
+            dmy_link_plugin_version(),
             true                
         );
         
@@ -646,9 +672,10 @@ register_uninstall_hook(__FILE__, 'dmy_link_uninstall');
 
 
 // 适配子比主题：接管评论链接和用户中心重定向
-// 必须在 after_setup_theme 中执行，此时主题及自定义函数均已注册完毕
+// after_setup_theme 兼容子比 8.9+；zib_require_end 兜底处理后续自定义函数注册
 if (is_zibll_themes()) {
     add_action('after_setup_theme', 'dmy_link_override_zibll_filters', 99);
+    add_action('zib_require_end', 'dmy_link_override_zibll_filters', 99);
 }
 
 /**
@@ -658,11 +685,13 @@ if (is_zibll_themes()) {
 function dmy_link_override_zibll_filters() {
     // 强制关闭子比主题的外链重定向和外链重定向鉴权
     // _pz() 使用静态缓存无法从外部重置，因此同时用 _spz() 写入 option 确保下次请求生效
-    if (_pz('go_link_s')) {
-        _spz('go_link_s', false);
-    }
-    if (_pz('go_link_nonce_s')) {
-        _spz('go_link_nonce_s', false);
+    if (function_exists('_pz') && function_exists('_spz')) {
+        if (_pz('go_link_s')) {
+            _spz('go_link_s', false);
+        }
+        if (_pz('go_link_nonce_s')) {
+            _spz('go_link_nonce_s', false);
+        }
     }
 
     // 移除主题原版评论链接处理
@@ -780,7 +809,7 @@ function dmy_get_redirect_url($url) {
 //查看用户全部详细资料的模态框
 function dmy_zib_ajax_user_details_data_modal()
 {
-    $user_id = !empty($_REQUEST['id']) ? absint(wp_unslash($_REQUEST['id'])) : 0;
+    $user_id = (!empty($_REQUEST['id']) && !is_array($_REQUEST['id'])) ? absint(wp_unslash($_REQUEST['id'])) : 0;
 
     $user = get_userdata($user_id);
     if (!$user_id || empty($user->ID)) {
@@ -845,7 +874,7 @@ function dmy_zib_get_user_details_data_modal($user_id = '', $class = 'mb10 flex'
             'spare'   => __('未知', 'zib_language'),
             'no_show' => true,
         ), array(
-            'title'   => 'QQ',
+            'title'   => __('QQ', 'zib_language'),
             'value'   => esc_attr(zib_get_user_meta($user_id, 'qq', true)),
             'spare'   => __('未知', 'zib_language'),
             'no_show' => true,
@@ -860,7 +889,7 @@ function dmy_zib_get_user_details_data_modal($user_id = '', $class = 'mb10 flex'
             'spare'   => __('未知', 'zib_language'),
             'no_show' => true,
         ), array(
-            'title'   => 'Github',
+            'title'   => __('Github', 'zib_language'),
             'value'   => esc_url(zib_get_user_meta($user_id, 'github', true)),
             'spare'   => __('未知', 'zib_language'),
             'no_show' => true,
@@ -916,8 +945,13 @@ function dmy_zib_get_user_details_data_modal($user_id = '', $class = 'mb10 flex'
 
 function dmy_zib_get_url_link($user_id, $class = 'focus-color')
 {
-    $user_url = get_userdata($user_id)->user_url;
+    $userdata = get_userdata($user_id);
+    if (!$userdata) {
+        return 0;
+    }
+
+    $user_url = $userdata->user_url;
     $url_name = zib_get_user_meta($user_id, 'url_name', true) ?: $user_url;
     $user_url = dmy_go_link($user_url, true);
-    return $user_url ? '<a class="' . $class . '" href="' . esc_url($user_url) . '" target="_blank">' . esc_attr($url_name) . '</a>' : 0;
+    return $user_url ? '<a class="' . esc_attr($class) . '" href="' . esc_url($user_url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($url_name) . '</a>' : 0;
 }
