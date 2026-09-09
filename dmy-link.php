@@ -2,10 +2,13 @@
 /*
 Plugin Name: 大绵羊外链跳转插件
 Description: 大绵羊外链跳转插件是一个非常实用的WordPress插件，它可以对文章中的外链进行过滤，有效地防止追踪和提醒用户。
-Version: 1.4.0
+Version: 1.5.0
 Author:  大绵羊
 Author URI: https://dmyblog.cn
 Plugin URI: https://github.com/dmmyblog/dmy-link
+Text Domain: dmylink
+Domain Path: /languages
+License: GPL-3.0-or-later
 */
 
 
@@ -31,7 +34,7 @@ if (!defined('ABSPATH')) {
 // 插件统一版本
 function dmy_link_plugin_version()
 {
-    return "1.4.0";
+    return "1.5.0";
 }
 $version = dmy_link_plugin_version();
 
@@ -43,6 +46,12 @@ define('DMY_LINK_URL', DMY_LINK_PLUGIN_URL);
 // 加载 GitHub Releases 自动更新
 require_once DMY_LINK_PLUGIN_DIR . 'src/Update/GitHubReleaseUpdater.php';
 DmyLink_GitHubReleaseUpdater::init(__FILE__, dmy_link_plugin_version());
+
+// 加载翻译文件（此前缺失，所有 __(..., 'dmylink') 实际不生效）
+function dmy_link_load_textdomain() {
+    load_plugin_textdomain('dmylink', false, dirname(plugin_basename(__FILE__)) . '/languages');
+}
+add_action('init', 'dmy_link_load_textdomain');
 
 // 判断当前主题是否是zibll主题或其子主题
 function is_zibll_themes()
@@ -210,38 +219,332 @@ function dmy_link_enqueue_styles() {
 }
 add_action('wp_enqueue_scripts', 'dmy_link_enqueue_styles');
 
-// 统一URL加密函数
-function dmy_link_encrypt_url($url) {
+//
+// ============ 安全核心：HMAC 签名令牌 & URL 判定（1.5.0） ============
+//
+
+// 令牌最长有效期（分钟），防止签发出长期可用的跳转链
+if (!defined('DMY_LINK_MAX_TTL_MINUTES')) {
+    define('DMY_LINK_MAX_TTL_MINUTES', 1440);
+}
+
+/**
+ * 取签名密钥（首次调用时生成并落库，与 AES 旧密钥无关）
+ */
+function dmy_link_get_signing_key() {
+    $key = get_option('dmy_link_signing_key');
+    if (!is_string($key) || strlen($key) < 32) {
+        $key = wp_generate_password(64, true, true);
+        update_option('dmy_link_signing_key', $key, false);
+    }
+    return $key;
+}
+
+function dmy_link_b64url_encode($raw) {
+    return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+}
+
+function dmy_link_b64url_decode($str) {
+    $str = strtr((string) $str, '-_', '+/');
+    $pad = strlen($str) % 4;
+    if ($pad) {
+        $str .= str_repeat('=', 4 - $pad);
+    }
+    return base64_decode($str, true);
+}
+
+/**
+ * 令牌有效期（秒），受 DMY_LINK_MAX_TTL_MINUTES 硬上限约束
+ */
+function dmy_link_get_ttl() {
     $settings = get_option('dmy_link_settings');
-    $method = isset($settings['dmy_link_verification_method']) ? $settings['dmy_link_verification_method'] : 'random_string';
-    
-    if ($method === 'aes_encryption') {
-        // AES加密方式（固定IV实现）
-        $key = isset($settings['dmy_link_aes_key']) ? $settings['dmy_link_aes_key'] : '';
-        if (empty($key)) {
-            // 密钥未设置时使用随机字符串方式
-            return generate_random_string(16);
+    // 旧版 AES 模式是「永不过期」，升级后给一个较长但有限的默认值，避免体验骤变
+    $default = (isset($settings['dmy_link_verification_method']) && $settings['dmy_link_verification_method'] === 'aes_encryption') ? 1440 : 5;
+    $minutes = isset($settings['dmy_link_expiration']) ? (int) $settings['dmy_link_expiration'] : $default;
+    if ($minutes < 1) {
+        $minutes = $default;
+    }
+    if ($minutes > DMY_LINK_MAX_TTL_MINUTES) {
+        $minutes = DMY_LINK_MAX_TTL_MINUTES;
+    }
+    return $minutes * 60;
+}
+
+/**
+ * 生成签名令牌：v1.<base64url(exp|url)>.<base64url(hmac)>
+ * 完全无状态，不写数据库；过期时间取整到时间片，保证整页缓存内令牌稳定
+ */
+function dmy_link_sign_url($url) {
+    $ttl  = dmy_link_get_ttl();
+    $step = (int) apply_filters('dmy_link_token_time_step', 600);
+    if ($step < 1) {
+        $step = 1;
+    }
+    $exp     = (int) (ceil((time() + $ttl) / $step) * $step);
+    $payload = dmy_link_b64url_encode($exp . '|' . $url);
+    $sig     = dmy_link_b64url_encode(hash_hmac('sha256', $payload, dmy_link_get_signing_key(), true));
+
+    return 'v1.' . $payload . '.' . $sig;
+}
+
+/**
+ * 校验签名令牌，返回目标 URL 或 false
+ */
+function dmy_link_verify_token($token) {
+    if (!is_string($token) || strncmp($token, 'v1.', 3) !== 0) {
+        return false;
+    }
+    $parts = explode('.', $token);
+    if (count($parts) !== 3) {
+        return false;
+    }
+    $payload  = $parts[1];
+    $sig      = $parts[2];
+    $expected = dmy_link_b64url_encode(hash_hmac('sha256', $payload, dmy_link_get_signing_key(), true));
+    if (!hash_equals($expected, $sig)) {
+        return false;
+    }
+
+    $raw = dmy_link_b64url_decode($payload);
+    if (!is_string($raw) || strpos($raw, '|') === false) {
+        return false;
+    }
+    list($exp, $url) = explode('|', $raw, 2);
+    if (!ctype_digit($exp) || (int) $exp < time()) {
+        return false;
+    }
+
+    return dmy_link_is_http_url($url) ? $url : false;
+}
+
+/**
+ * 归一化：解 HTML 实体、补全协议相对地址
+ */
+function dmy_link_prepare_url($raw) {
+    $url = trim(html_entity_decode((string) $raw, ENT_QUOTES, 'UTF-8'));
+    if (strpos($url, '//') === 0) {
+        $url = 'https:' . $url;
+    }
+    return $url;
+}
+
+/**
+ * 是否为可跳转的 http(s) 绝对地址（javascript:/data:/mailto: 等一律为 false）
+ */
+function dmy_link_is_http_url($url) {
+    if (!is_string($url) || trim($url) === '') {
+        return false;
+    }
+    $parsed = parse_url(trim($url));
+    if (!is_array($parsed) || empty($parsed['host']) || empty($parsed['scheme'])) {
+        return false;
+    }
+    $scheme = strtolower($parsed['scheme']);
+    return ($scheme === 'http' || $scheme === 'https');
+}
+
+/**
+ * host/path 规则匹配（域名要求完全相等或为子域，路径按 / 分段，杜绝前缀绕过）
+ */
+function dmy_link_matches_rule_list($url, $rules) {
+    $parsed = parse_url(dmy_link_prepare_url($url));
+    if (!is_array($parsed) || empty($parsed['host'])) {
+        return false;
+    }
+    $host = strtolower($parsed['host']);
+    $path = isset($parsed['path']) && $parsed['path'] !== '' ? $parsed['path'] : '/';
+
+    foreach (preg_split('/[\r\n]+/', (string) $rules) as $rule) {
+        $rule = trim($rule);
+        if ($rule === '') {
+            continue;
         }
-        
-        // 使用密钥派生固定IV（确保相同URL生成相同加密结果）
-        $iv = substr(hash('sha256', $key, true), 0, 16);
-        $encrypted = openssl_encrypt($url, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
-        return base64_encode($encrypted);
+        if (strpos($rule, '://') === false) {
+            $rule = 'https://' . ltrim($rule, '/');
+        }
+        $r = parse_url($rule);
+        if (!is_array($r) || empty($r['host'])) {
+            continue;
+        }
+        $rule_host = strtolower($r['host']);
+        $rule_path = isset($r['path']) ? rtrim($r['path'], '/') : '';
+
+        // 关键：example.com 不得命中 example.com.evil.com
+        if ($host !== $rule_host && substr($host, -(strlen($rule_host) + 1)) !== '.' . $rule_host) {
+            continue;
+        }
+        if ($rule_path === '') {
+            return true;
+        }
+        if ($path === $rule_path || strpos($path, $rule_path . '/') === 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * 是否站内链接（锚点、查询串、相对路径为站内；非 http(s) 协议不算站内）
+ */
+function dmy_link_is_internal_url($url) {
+    $url = dmy_link_prepare_url($url);
+    if ($url === '' || $url[0] === '#' || $url[0] === '?') {
+        return true;
+    }
+    $parsed = parse_url($url);
+    if (!is_array($parsed)) {
+        return true; // 解析不了就不动它
+    }
+    if (empty($parsed['host'])) {
+        // 无 host：只有不带协议的相对路径才是站内
+        return empty($parsed['scheme']);
+    }
+    $home = parse_url(home_url());
+    return isset($home['host']) && strcasecmp($parsed['host'], $home['host']) === 0;
+}
+
+function dmy_link_is_whitelisted_url($url, $option_name = 'dmy_link_settings') {
+    $options = get_option($option_name);
+    if (!is_array($options) || empty($options['dmy_link_whitelist']) || !is_string($options['dmy_link_whitelist'])) {
+        return false;
+    }
+    return dmy_link_matches_rule_list($url, $options['dmy_link_whitelist']);
+}
+
+/**
+ * 统一的拦截判定：只有「http(s) + 站外 + 非白名单」才改写
+ */
+function dmy_link_should_intercept($url) {
+    $url = dmy_link_prepare_url($url);
+    if (!dmy_link_is_http_url($url)) {
+        return false;
+    }
+    if (dmy_link_is_internal_url($url)) {
+        return false;
+    }
+    return !dmy_link_is_whitelisted_url($url);
+}
+
+/**
+ * 为改写后的外链补齐 target / rel，防止反向标签劫持
+ */
+function dmy_link_ensure_blank_attrs($attrs) {
+    if (!preg_match('/\btarget\s*=/i', $attrs)) {
+        $attrs .= ' target="_blank"';
+    }
+    if (preg_match('/\brel\s*=\s*(["\'])(.*?)\1/i', $attrs, $m)) {
+        $rel = $m[2];
+        foreach (array('noopener', 'noreferrer') as $token) {
+            if (!preg_match('/\b' . $token . '\b/i', $rel)) {
+                $rel = trim($rel . ' ' . $token);
+            }
+        }
+        $attrs = str_replace($m[0], 'rel="' . esc_attr($rel) . '"', $attrs);
     } else {
-        // 随机字符串方式（默认）
-        return generate_random_string(16);
+        $attrs .= ' rel="noopener noreferrer"';
+    }
+    return $attrs;
+}
+
+/**
+ * 客户端 IP（只认 REMOTE_ADDR，不信任任何可伪造的转发头）
+ */
+function dmy_link_get_client_ip() {
+    return isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+}
+
+/**
+ * 简易按 IP 限流，用于公开的 AJAX 接口
+ */
+function dmy_link_check_rate_limit($bucket, $limit = 120, $window = 300) {
+    $limit = (int) apply_filters('dmy_link_rate_limit', $limit, $bucket);
+    if ($limit <= 0) {
+        return true;
+    }
+    $key  = 'dmy_rl_' . md5($bucket . '|' . dmy_link_get_client_ip());
+    $hits = (int) get_transient($key);
+    if ($hits >= $limit) {
+        return false;
+    }
+    set_transient($key, $hits + 1, $window);
+    return true;
+}
+
+/**
+ * 带「返回首页」按钮的错误页（HTML 不进翻译字符串）
+ */
+function dmy_link_die_with_home($message, $title, $status) {
+    $button = sprintf(
+        '<br><br><a href="%s" style="padding:10px 20px;background-color:#0073aa;color:#fff;text-decoration:none;border-radius:5px;">%s</a>',
+        esc_url(home_url('/')),
+        esc_html__('返回首页', 'dmylink')
+    );
+    wp_die($message . $button, $title, array('response' => (int) $status, 'back_link' => false));
+}
+
+/**
+ * 解析 ?a= 令牌，兼容 1.4.x 及更早签发的旧链接
+ */
+function dmy_link_resolve_token($token, $settings) {
+    $url = dmy_link_verify_token($token);
+    if ($url) {
+        return $url;
+    }
+
+    // 兼容旧链接（可在设置中关闭）。旧的 AES 令牌永不过期，建议缓存刷新后关闭。
+    if (isset($settings['dmy_link_legacy_token']) && empty($settings['dmy_link_legacy_token'])) {
+        return false;
+    }
+
+    $legacy = str_replace(' ', '+', (string) $token);
+
+    $stored = get_transient('dmy_link_' . $legacy);
+    if ($stored && dmy_link_is_http_url($stored)) {
+        return $stored;
+    }
+
+    if (!empty($settings['dmy_link_aes_key']) && function_exists('openssl_decrypt')) {
+        $key = $settings['dmy_link_aes_key'];
+        $iv  = substr(hash('sha256', $key, true), 0, 16);
+        $raw = base64_decode($legacy, true);
+        if ($raw !== false && $raw !== '' && strlen($raw) % 16 === 0) {
+            $decrypted = openssl_decrypt($raw, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+            if ($decrypted && dmy_link_is_http_url($decrypted)) {
+                return $decrypted;
+            }
+        }
+    }
+
+    return false;
+}
+
+//
+// 向后兼容的函数别名（旧名字过于通用，易与主题/插件冲突）
+//
+if (!function_exists('is_internal_link')) {
+    function is_internal_link($url) {
+        return dmy_link_is_internal_url($url);
+    }
+}
+if (!function_exists('is_whitelisted_link')) {
+    function is_whitelisted_link($url, $option_name = 'dmy_link_settings') {
+        return dmy_link_is_whitelisted_url($url, $option_name);
+    }
+}
+if (!function_exists('generate_random_string')) {
+    function generate_random_string($length = 16) {
+        return wp_generate_password((int) $length, false, false) . '_' . time();
     }
 }
 
-// 生成随机字符串（用于随机字符串方式）
-function generate_random_string($length = 16) {
-    $characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    $random_string = '';
-    for ($i = 0; $i < $length; $i++) {
-        $random_string .= $characters[wp_rand(0, strlen($characters) - 1)];
-    }
-    return $random_string . '_' . time();
+/**
+ * @deprecated 1.5.0 保留函数名，内部改为 HMAC 签名，不再写数据库
+ */
+function dmy_link_encrypt_url($url) {
+    return dmy_link_sign_url(dmy_link_prepare_url($url));
 }
+
 
 /**
  * 跳转页 slug 清洗
@@ -266,9 +569,10 @@ function dmy_link_get_slug() {
 /**
  * 构造跳转链接（根据自定义 slug 生成）
  */
-function dmy_link_build_redirect_url($encrypted_key) {
+function dmy_link_build_redirect_url($token) {
     $slug = dmy_link_get_slug();
-    return esc_url(home_url('/' . $slug . '?a=' . urlencode($encrypted_key)));
+    // 返回未做 HTML 转义的 URL，由调用方按输出场景处理（HTML 用 esc_url，JSON 用原值）
+    return esc_url_raw(home_url('/' . $slug . '?a=' . rawurlencode($token)));
 }
 
 // 拦截所有外部链接并生成跳转Key
@@ -279,99 +583,33 @@ function dmy_link_intercept_links($content) {
         return $content; // 开关关闭时返回原始内容
     }
 
-    return preg_replace_callback(
-        '/<a\s+([^>]*?)href="([^"]*)"([^>]*?)>/i', 
-        function($matches) use ($settings) {
-            $url = $matches[2];
+    $result = preg_replace_callback(
+        '/<a\s+([^>]*?)href\s*=\s*(["\'])(.*?)\2([^>]*?)>/i',
+        function ($matches) {
             $beforeHref = $matches[1];
-            $afterHref = $matches[3];
+            $rawUrl     = $matches[3];
+            $afterHref  = $matches[4];
 
-            // 检查是否是内部链接或白名单链接
-            if (!is_internal_link($url) && !is_whitelisted_link($url, 'dmy_link_settings')) {
-                $encrypted_key = dmy_link_encrypt_url($url);
-                
-                // 根据加密方式设置过期时间
-                $method = isset($settings['dmy_link_verification_method']) ? $settings['dmy_link_verification_method'] : 'random_string';
-                
-                if ($method === 'random_string') {
-                    $expiration = isset($settings['dmy_link_expiration']) ? intval($settings['dmy_link_expiration']) : 5;
-                    $expiration_time = $expiration * 60;
-                    set_transient('dmy_link_' . $encrypted_key, $url, $expiration_time);
-                } else {
-                    // AES方式永不过期（0表示永不过期）
-                    set_transient('dmy_link_' . $encrypted_key, $url, 0);
-                }
-                
-                $newHref = dmy_link_build_redirect_url($encrypted_key);
-                
-                // 检查是否已有 target="_blank"
-                if (!preg_match('/target\s*=\s*[\'\"][^"\']*_blank[^"\']*[\'\"]/i', $afterHref)) {
-                    $afterHref .= ' target="_blank"';
-                }
-                
-                return '<a ' . $beforeHref . 'href="' . $newHref . '"' . $afterHref . '>';
+            // 站内 / 白名单 / 非 http(s)（javascript:、mailto:、锚点等）一律保持原样
+            if (!dmy_link_should_intercept($rawUrl)) {
+                return $matches[0];
             }
-            
-            // 检查原始链接是否已有 target="_blank"
-            if (!preg_match('/target\s*=\s*[\'\"][^"\']*_blank[^"\']*[\'\"]/i', $afterHref)) {
-                $afterHref .= ' target="_blank"';
-            }
-            
-            return '<a ' . $beforeHref . 'href="' . $url . '"' . $afterHref . '>';
-        }, 
+
+            $url     = dmy_link_prepare_url($rawUrl);
+            $newHref = dmy_link_build_redirect_url(dmy_link_sign_url($url));
+
+            return '<a ' . $beforeHref . 'href="' . esc_url($newHref) . '"'
+                 . dmy_link_ensure_blank_attrs($afterHref) . '>';
+        },
         $content
     );
+
+    // PCRE 回溯超限时会返回 null，此时必须回退原文，否则整篇内容会被清空
+    return ($result === null) ? $content : $result;
 }
 add_filter('the_content', 'dmy_link_intercept_links');
 
-// 判断是否是内部链接
-function is_internal_link($url) {
-    $parsed_url = parse_url($url);
-    $home_url = parse_url(home_url());
-    
-    // 相对路径链接（没有host）视为内部链接
-    if (!isset($parsed_url['host'])) {
-        return true;
-    }
-    
-    return strcasecmp($parsed_url['host'], $home_url['host']) === 0;
-}
 
-// 检查链接是否在白名单
-function is_whitelisted_link($url, $option_name) {
-    $options = get_option($option_name);
-    if (!isset($options['dmy_link_whitelist']) || !is_string($options['dmy_link_whitelist'])) {
-        return false;
-    }
-    $whitelist = explode("\n", trim($options['dmy_link_whitelist']));
-
-    $parsed_url = parse_url($url);
-    $host_and_path = isset($parsed_url['host']) ? $parsed_url['host'] : '';
-    $host_and_path .= isset($parsed_url['path']) ? $parsed_url['path'] : '';
-
-    foreach ($whitelist as $whitelisted) {
-        $whitelisted = trim($whitelisted);
-        if (empty($whitelisted)) {
-            continue;
-        }
-
-        $whitelisted_parsed = parse_url($whitelisted);
-        $whitelisted_host_and_path = isset($whitelisted_parsed['host']) ? $whitelisted_parsed['host'] : '';
-        $whitelisted_host_and_path .= isset($whitelisted_parsed['path']) ? $whitelisted_parsed['path'] : '';
-
-        if ($whitelisted_host_and_path === '/') {
-            if ($host_and_path === '/') {
-                return true;
-            }
-        } else {
-            if (strpos($host_and_path, $whitelisted_host_and_path) === 0) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
 
 //
 // Referer 防护辅助函数
@@ -400,31 +638,8 @@ function dmy_is_referer_whitelisted($referer, $settings) {
     if (!isset($settings['dmy_link_referer_whitelist']) || !is_string($settings['dmy_link_referer_whitelist'])) {
         return false;
     }
-    $whitelist = explode("\n", trim($settings['dmy_link_referer_whitelist']));
-
-    $parsed = parse_url($referer);
-    $host_and_path = (isset($parsed['host']) ? $parsed['host'] : '') . (isset($parsed['path']) ? $parsed['path'] : '');
-
-    foreach ($whitelist as $whitelisted) {
-        $whitelisted = trim($whitelisted);
-        if ($whitelisted === '') {
-            continue;
-        }
-        // 允许仅填写域名，自动补全协议便于 parse_url
-        $candidate = (strpos($whitelisted, '://') !== false) ? $whitelisted : ('https://' . $whitelisted);
-        $w_parsed = parse_url($candidate);
-        $w_host_and_path = (isset($w_parsed['host']) ? $w_parsed['host'] : '') . (isset($w_parsed['path']) ? $w_parsed['path'] : '');
-        if ($w_host_and_path === '/') {
-            if ($host_and_path === '/') {
-                return true;
-            }
-        } else {
-            if (strpos($host_and_path, $w_host_and_path) === 0) {
-                return true;
-            }
-        }
-    }
-    return false;
+    // 与外链白名单共用带边界的匹配，避免 example.com 命中 example.com.evil.com
+    return dmy_link_matches_rule_list($referer, $settings['dmy_link_referer_whitelist']);
 }
 
 function dmy_link_is_allowed_referer($referer, $settings, $allow_empty = false) {
@@ -443,7 +658,7 @@ function dmy_link_get_ajax_url_from_request() {
     return esc_url_raw(wp_unslash($_POST['url']));
 }
 
-// 部分代码是不使用的老代码/在部分情况可以触发
+// 跳转页处理：仅在前台且命中跳转页 slug 时接管
 function dmy_link_redirect() {
     // 检查总开关状态
     $settings = get_option('dmy_link_settings');
@@ -451,71 +666,47 @@ function dmy_link_redirect() {
         return; // 开关关闭时不处理重定向
     }
 
-
-    if (isset($_GET['a'])) {
-        // Referer 防护 禁止站外直接访问跳转页
-        if (!empty($settings['dmy_link_referer_protect'])) {
-            $referer = dmy_link_get_request_referer();
-            $allow_empty = !empty($settings['dmy_link_referer_allow_empty']);
-            $is_safe = dmy_link_is_allowed_referer($referer, $settings, $allow_empty);
-
-            if (!$is_safe) {
-                $home_url = home_url('/');
-                $back_to_home_button = sprintf(
-                    '<br><br><a href="%s" style="padding: 10px 20px; background-color: #0073aa; color: #fff; text-decoration: none; border-radius: 5px;">返回首页</a>',
-                    esc_url($home_url)
-                );
-                wp_die(
-                    __('危险：禁止站外直接访问跳转页面', 'dmylink') . $back_to_home_button,
-                    __('访问受限', 'dmylink'),
-                    ['response' => 403, 'back_link' => false]
-                );
-            }
-        }
-
-        $raw_key = (isset($_GET['a']) && !is_array($_GET['a'])) ? wp_unslash($_GET['a']) : '';
-        $encrypted_key = sanitize_text_field($raw_key);
-        // 修复 URL 传输中 + 号被转换为空格的问题：必须先还原，再读取 transient / AES 解密
-        $encrypted_key = str_replace(' ', '+', $encrypted_key);
-        $link = get_transient('dmy_link_' . $encrypted_key);
-
-        // 尝试AES解密（如果是AES加密的链接）
-        if (!$link) {
-            if (isset($settings['dmy_link_verification_method']) && 
-                $settings['dmy_link_verification_method'] === 'aes_encryption' &&
-                !empty($settings['dmy_link_aes_key'])) {
-                
-                $key = $settings['dmy_link_aes_key'];
-                // 使用密钥派生固定IV（与加密过程一致）
-                $iv = substr(hash('sha256', $key, true), 0, 16);
-                $encrypted = base64_decode($encrypted_key, true);
-                if (false !== $encrypted) {
-                    $link = openssl_decrypt($encrypted, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
-                }
-            }
-        }
-
-        if (!$link) {
-            // 返回首页的按钮
-            $home_url = home_url('/'); 
-            $back_to_home_button = sprintf(
-                '<br><br><a href="%s" style="padding: 10px 20px; background-color: #0073aa; color: #fff; text-decoration: none; border-radius: 5px;">返回首页</a>',
-                esc_url($home_url)
-            );
-
-            // 显示错误信息
-            wp_die(
-                __('<span style="font-weight: 600; color: #d72c2cbd;">管理员:</span>拦截Token过期,你不可以在使用此Token,<span style="color: #d78d2cbd;">你可以刷新页面重新获取 </span><br> 如果刷新依旧看到这个页面请联系本站长处理', 'dmylink') . $back_to_home_button,
-                __('拦截Token过期提示也有可能是wordpress出现错误', 'dmylink'), 
-                ['response' => 404, 'back_link' => false]
-            );
-        }
-
-        include_once(plugin_dir_path(__FILE__) . 'dmylink-template.php');
-        exit;
+    // 只在前台跳转页生效：后台、AJAX、REST 一律不接管
+    if (is_admin() || (function_exists('wp_doing_ajax') && wp_doing_ajax())) {
+        return;
     }
+    if (defined('REST_REQUEST') && REST_REQUEST) {
+        return;
+    }
+
+    if (!isset($_GET['a']) || is_array($_GET['a'])) {
+        return;
+    }
+
+    // Referer 防护：禁止站外直接访问跳转页
+    if (!empty($settings['dmy_link_referer_protect'])) {
+        $referer     = dmy_link_get_request_referer();
+        $allow_empty = !empty($settings['dmy_link_referer_allow_empty']);
+        if (!dmy_link_is_allowed_referer($referer, $settings, $allow_empty)) {
+            dmy_link_die_with_home(
+                esc_html__('危险：禁止站外直接访问跳转页面', 'dmylink'),
+                esc_html__('访问受限', 'dmylink'),
+                403
+            );
+        }
+    }
+
+    $token = sanitize_text_field(wp_unslash($_GET['a']));
+    $link  = dmy_link_resolve_token($token, $settings);
+
+    // 最终防线：只允许 http(s) 外链落到模板里
+    if (!$link || !dmy_link_is_http_url($link)) {
+        dmy_link_die_with_home(
+            '<span style="font-weight:600;color:#d72c2c;">' . esc_html__('提示', 'dmylink') . '：</span>'
+                . esc_html__('跳转链接已失效，请返回原页面刷新后重新点击。', 'dmylink'),
+            esc_html__('跳转链接已失效', 'dmylink'),
+            404
+        );
+    }
+
+    include_once(plugin_dir_path(__FILE__) . 'dmylink-template.php');
+    exit;
 }
-add_action('init', 'dmy_link_redirect');
 
 
 // 添加重定向规则
@@ -528,8 +719,15 @@ add_action('init', 'dmy_link_rewrite_rules');
 
 register_activation_hook(__FILE__, 'dmy_link_activate');
 function dmy_link_activate() {
-    // 激活时按照当前设置生成重写规则并刷新
+    // 激活时生成签名密钥，并按当前设置生成重写规则
+    dmy_link_get_signing_key();
     dmy_link_rewrite_rules();
+    flush_rewrite_rules();
+}
+
+register_deactivation_hook(__FILE__, 'dmy_link_deactivate');
+function dmy_link_deactivate() {
+    // 停用时清掉跳转页重写规则，避免残留
     flush_rewrite_rules();
 }
 
@@ -555,6 +753,16 @@ add_filter('query_vars', 'dmy_link_query_vars');
 function dmy_link_template_redirect() {
     if (get_query_var('dinterception') == 1) {
         dmy_link_redirect();
+        return;
+    }
+
+    // 重写规则未刷新时的兜底：请求路径正好等于跳转页 slug
+    if (!isset($_SERVER['REQUEST_URI'])) {
+        return;
+    }
+    $path = trim((string) parse_url(wp_unslash($_SERVER['REQUEST_URI']), PHP_URL_PATH), '/');
+    if ($path !== '' && $path === dmy_link_get_slug()) {
+        dmy_link_redirect();
     }
 }
 add_action('template_redirect', 'dmy_link_template_redirect');
@@ -563,45 +771,35 @@ add_action('wp_ajax_dmylink_convert', 'dmylink_ajax_convert');
 add_action('wp_ajax_nopriv_dmylink_convert', 'dmylink_ajax_convert');
 
 function dmylink_ajax_convert() {
-    // 此接口为公开URL加密服务（非状态修改操作），同时注册了 nopriv
-    // Nginx 缓存环境下 PHP 输出的 nonce 会过期，因此不使用 check_ajax_referer
-    // 改用 Referer 检查防止外部站点滥用
+    // 公开的 URL 签名服务（注册了 nopriv）。Nginx 整页缓存下 PHP 输出的 nonce 会过期，
+    // 因此不用 check_ajax_referer，改为「Referer 校验 + 按 IP 限流 + 令牌强制有限期」三重约束。
     $settings = get_option('dmy_link_settings');
+
+    // 检查总开关状态
+    if (empty($settings['dmy_link_enable'])) {
+        wp_send_json_error(array('message' => __('插件已关闭', 'dmylink')), 403);
+    }
+
     $referer = dmy_link_get_request_referer();
     if (!dmy_link_is_allowed_referer($referer, $settings, false)) {
         wp_send_json_error(array('message' => __('非法请求', 'dmylink')), 403);
     }
 
-    // 检查总开关状态
-    if (empty($settings['dmy_link_enable'])) {
-        wp_send_json_error(array('message' => __('插件已关闭', 'dmylink')));
+    if (!dmy_link_check_rate_limit('convert', 300, 300)) {
+        wp_send_json_error(array('message' => __('请求过于频繁，请稍后再试', 'dmylink')), 429);
     }
 
     $url = dmy_link_get_ajax_url_from_request();
-    if (empty($url) || !wp_http_validate_url($url)) {
+    if (empty($url) || !dmy_link_is_http_url($url) || !wp_http_validate_url($url)) {
         wp_send_json_error(array('message' => __('链接参数无效', 'dmylink')), 400);
     }
 
     // 站内或白名单直接放行
-    if (is_internal_link($url) || is_whitelisted_link($url, 'dmy_link_settings')) {
-        wp_send_json_success(array('url' => $url));
+    if (!dmy_link_should_intercept($url)) {
+        wp_send_json_success(array('url' => esc_url_raw($url)));
     }
 
-    // 使用统一加密函数
-    $encrypted_key = dmy_link_encrypt_url($url);
-    
-    // 根据加密方式设置过期时间
-    $method = isset($settings['dmy_link_verification_method']) ? $settings['dmy_link_verification_method'] : 'random_string';
-    
-    if ($method === 'random_string') {
-        $ttl = isset($settings['dmy_link_expiration']) ? (int)$settings['dmy_link_expiration'] : 5;
-        set_transient('dmy_link_' . $encrypted_key, $url, $ttl * 60);
-    } else {
-        // AES方式永不过期
-        set_transient('dmy_link_' . $encrypted_key, $url, 0);
-    }
-
-    wp_send_json_success(array('url' => dmy_link_build_redirect_url($encrypted_key)));
+    wp_send_json_success(array('url' => dmy_link_build_redirect_url(dmy_link_sign_url($url))));
 }
 
 
@@ -652,21 +850,26 @@ add_action( 'wp_enqueue_scripts', function () {
 
 // 插件卸载时清理数据
 function dmy_link_uninstall() {
-    // 删除插件设置选项
     delete_option('dmy_link_settings');
-    
-    // 清理所有插件相关的transient数据
+    delete_option('dmy_link_signing_key');
+    delete_site_transient('dmy_link_latest_release');
+
+    // 清理插件遗留的 transient（1.4.x 及更早的令牌、以及限流计数）
     global $wpdb;
-    $transients = $wpdb->get_col(
-        "SELECT option_name FROM $wpdb->options 
-        WHERE option_name LIKE '_transient_dmy_link_%' 
-        OR option_name LIKE '_transient_timeout_dmy_link_%'"
+    $rows = $wpdb->get_col(
+        "SELECT option_name FROM {$wpdb->options}
+         WHERE option_name LIKE '\_transient\_dmy\_link\_%'
+            OR option_name LIKE '\_transient\_timeout\_dmy\_link\_%'
+            OR option_name LIKE '\_transient\_dmy\_rl\_%'
+            OR option_name LIKE '\_transient\_timeout\_dmy\_rl\_%'"
     );
-    
-    foreach ($transients as $transient) {
-        $name = str_replace('_transient_', '', $transient);
+
+    foreach ((array) $rows as $row) {
+        $name = preg_replace('/^_transient_(timeout_)?/', '', $row);
         delete_transient($name);
     }
+
+    flush_rewrite_rules();
 }
 register_uninstall_hook(__FILE__, 'dmy_link_uninstall');
 
@@ -751,64 +954,56 @@ function dmy_go_link($text = '', $link = false) {
 
     // 纯链接模式：直接返回跳转URL或原URL
     if ($link) {
-        if (!is_internal_link($text) && !is_whitelisted_link($text, 'dmy_link_settings')) {
-            return dmy_get_redirect_url($text);
-        }
-        return $text;
+        return dmy_link_should_intercept($text) ? dmy_get_redirect_url($text) : $text;
     }
 
     // 1. 处理纯链接（如评论作者链接，可能直接是URL而非<a>标签）
-    if (preg_match('/^https?:\/\//', $text) && !preg_match('/<a.*?>/', $text)) {
-        if (!is_internal_link($text) && !is_whitelisted_link($text, 'dmy_link_settings')) {
-            return dmy_get_redirect_url($text);
-        }
-        return $text;
+    if (preg_match('/^https?:\/\//i', trim($text)) && !preg_match('/<a[\s>]/i', $text)) {
+        return dmy_link_should_intercept($text) ? dmy_get_redirect_url($text) : $text;
     }
 
     // 2. 处理带<a>标签的链接（如评论内容中的链接）
-    preg_match_all("/<a(.*?)href=['\"](.*?)['\"](.*?)>/", $text, $matches);
-    if ($matches) {
-        foreach ($matches[2] as $val) {
-            if (!is_internal_link($val) && !is_whitelisted_link($val, 'dmy_link_settings')) {
-                $redirect_url = dmy_get_redirect_url($val);
-                $text = str_replace(
-                    array("href=\"$val\"", "href='$val'"),
-                    "href=\"$redirect_url\"",
-                    $text
-                );
+    $result = preg_replace_callback(
+        '/<a\s+([^>]*?)href\s*=\s*(["\'])(.*?)\2([^>]*?)>/i',
+        function ($matches) {
+            $beforeHref = $matches[1];
+            $rawUrl     = $matches[3];
+            $afterHref  = $matches[4];
+
+            if (!dmy_link_should_intercept($rawUrl)) {
+                return $matches[0];
             }
-        }
-        // 统一添加target="_blank"（避免重复添加）
-        foreach ($matches[0] as $a_tag) {
-            if (!preg_match('/target=["\']_blank["\']/', $a_tag)) {
-                $text = str_replace($a_tag, str_replace('<a', '<a target="_blank"', $a_tag), $text);
-            }
-        }
-    }
-    return $text;
+
+            $newHref = dmy_get_redirect_url(dmy_link_prepare_url($rawUrl));
+
+            return '<a ' . $beforeHref . 'href="' . esc_url($newHref) . '"'
+                 . dmy_link_ensure_blank_attrs($afterHref) . '>';
+        },
+        $text
+    );
+
+    return ($result === null) ? $text : $result;
 }
 
 /**
  * 生成插件的跳转链接（替代主题的zib_get_gourl）
  */
 function dmy_get_redirect_url($url) {
-    $encrypted_key = dmy_link_encrypt_url($url);
-    // 存储链接（复用插件原有逻辑）
-    $settings = get_option('dmy_link_settings');
-    $method = isset($settings['dmy_link_verification_method']) ? $settings['dmy_link_verification_method'] : 'random_string';
-    if ($method === 'random_string') {
-        $expiration = isset($settings['dmy_link_expiration']) ? intval($settings['dmy_link_expiration']) : 5;
-        set_transient('dmy_link_' . $encrypted_key, $url, $expiration * 60);
-    } else {
-        set_transient('dmy_link_' . $encrypted_key, $url, 0); // AES模式永不过期
-    }
-    return dmy_link_build_redirect_url($encrypted_key);
+    return dmy_link_build_redirect_url(dmy_link_sign_url(dmy_link_prepare_url($url)));
 }
 
 
 //查看用户全部详细资料的模态框
 function dmy_zib_ajax_user_details_data_modal()
 {
+    // 公开接口（注册了 nopriv），限流以阻断按 id 批量枚举用户资料
+    if (!dmy_link_check_rate_limit('user_modal', 60, 300)) {
+        if (function_exists('zib_ajax_notice_modal')) {
+            zib_ajax_notice_modal('danger', __('请求过于频繁，请稍后再试', 'dmylink'));
+        }
+        wp_die(esc_html__('请求过于频繁，请稍后再试', 'dmylink'), '', array('response' => 429));
+    }
+
     $user_id = (!empty($_REQUEST['id']) && !is_array($_REQUEST['id'])) ? absint(wp_unslash($_REQUEST['id'])) : 0;
 
     $user = get_userdata($user_id);
@@ -919,11 +1114,21 @@ function dmy_zib_get_user_details_data_modal($user_id = '', $class = 'mb10 flex'
         $lists .= '</div>';
     }
 
+    // 游客脱敏：未登录访客一律看不到敏感字段，防止匿名批量收集邮箱/QQ/微信
+    $settings   = get_option('dmy_link_settings');
+    $guard_guest = !isset($settings['dmy_link_userinfo_guard']) || !empty($settings['dmy_link_userinfo_guard']);
+
     foreach ($datas as $data) {
-        if (!is_super_admin() && $data['no_show'] && 'public' != $privacy && $current_id != $user_id) {
+        $hidden = false;
+        if ($guard_guest && !$current_id && $data['no_show']) {
+            $hidden = true;
+        } elseif (!is_super_admin() && $data['no_show'] && 'public' != $privacy && $current_id != $user_id) {
             if (('just_logged' == $privacy && !$current_id) || 'just_logged' != $privacy) {
-                $data['value'] = __('用户未公开', 'zib_language');
+                $hidden = true;
             }
+        }
+        if ($hidden) {
+            $data['value'] = __('用户未公开', 'zib_language');
         }
         $lists .= '<div class="' . $class . '" style="min-width: 50%;">';
         $lists .= '<div class="author-set-left ' . $t_class . '" style="min-width: 80px;">' . $data['title'] . '</div>';

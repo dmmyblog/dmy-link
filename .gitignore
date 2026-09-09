@@ -1,0 +1,58 @@
+# ---------------------------------------------------------------
+# 大绵羊外链跳转插件 .gitignore
+# 说明：codestar-framework/ 是随插件分发的内嵌依赖，必须提交，不要忽略。
+#      languages/ 下的 .po / .mo 是翻译产物，也需要提交。
+# ---------------------------------------------------------------
+
+# 发布打包产物（见 .github/workflows/release.yml）
+/build/
+/dmy-link/
+*.zip
+
+# 依赖目录（当前未使用，预留）
+/vendor/
+/node_modules/
+/docs
+
+# PHP 工具缓存
+.phpunit.result.cache
+.php-cs-fixer.cache
+.phpcs-cache
+/phpcs.xml
+/phpunit.xml
+!/phpunit.xml.dist
+
+# 日志与临时文件
+*.log
+debug.log
+error_log
+*.tmp
+*.cache
+
+# 编辑器 / IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.fleet/
+nbproject/
+*.code-workspace
+
+# 备份与补丁残留
+*.bak
+*.orig
+*.rej
+*~
+*.swp
+*.swo
+
+# 操作系统产物
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

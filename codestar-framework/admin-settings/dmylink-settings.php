@@ -4,7 +4,7 @@
  * 
  * @package 大绵羊外链跳转插件
  * @author 大绵羊 & 天无神话
- * @version 1.4.0
+ * @version 1.5.0
  */
 
 // 防止直接访问
@@ -271,39 +271,65 @@ function dmy_link_create_security_section($prefix) {
         'icon'   => 'fa fa-lock',
         'fields' => [
             [
-                'id'      => 'dmy_link_verification_method',
-                'type'    => 'radio',
-                'title'   => '链接验证方式',
-                'options' => [
-                    'random_string'  => '随机字符串 + 过期机制',
-                    'aes_encryption' => 'AES加密 + 后端验证',
-                ],
-                'default' => 'random_string',
-                'desc'    => '选择链接验证的安全机制'
+                'type'    => 'subheading',
+                'content' => '<strong>1.5.0 起统一使用 HMAC-SHA256 签名令牌</strong>：跳转令牌不再写入数据库，'
+                           . '与 CDN / Nginx 整页缓存天然兼容；令牌内置有效期，硬上限 24 小时，'
+                           . '旧版「AES 加密 + 永不过期」模式已停止签发。',
             ],
             [
                 'id'        => 'dmy_link_expiration',
                 'type'      => 'number',
-                'title'     => '过期时间（分钟）',
-                'desc'      => '设置外链跳转链接的过期时间，单位为分钟<br/>默认为5分钟',
+                'title'     => '链接有效期（分钟）',
+                'desc'      => '跳转令牌的有效期，单位分钟。默认 5 分钟，最长 1440 分钟（24 小时）。<br/>'
+                             . '有效期越长，令牌被复制到站外滥用的窗口越大，建议保持较小值。',
                 'default'   => 5,
                 'min'       => 1,
                 'max'       => 1440,
-                'dependency' => ['dmy_link_verification_method', '==', 'random_string'],
             ],
             [
-                'id'        => 'dmy_link_aes_key',
-                'type'      => 'text',
-                'title'     => 'AES加密密钥',
-                'desc'      => '请输入32个字符的密钥（用于加密跳转链接）',
-                'default'   => bin2hex(openssl_random_pseudo_bytes(16)),
-                'dependency' => ['dmy_link_verification_method', '==', 'aes_encryption'],
+                'id'      => 'dmy_link_legacy_token',
+                'type'    => 'switcher',
+                'title'   => '兼容 1.4.x 及更早的旧链接',
+                'desc'    => '开启后仍可解析升级前签发的旧令牌（随机串 / AES 密文）。<br/>'
+                           . '<strong>注意：旧的 AES 令牌永不过期</strong>，站点缓存刷新完毕后建议关闭此项，'
+                           . '关闭后所有历史旧链接立即失效。',
+                'default' => true,
+            ],
+            [
+                'id'      => 'dmy_link_userinfo_guard',
+                'type'    => 'switcher',
+                'title'   => '游客访问用户资料时脱敏',
+                'desc'    => '仅在子比主题下生效。开启后，未登录访客无法通过用户资料模态框看到'
+                           . '邮箱 / QQ / 微信 / 地址等字段，防止匿名批量收集。',
+                'default' => true,
+            ],
+            [
+                'id'         => 'dmy_link_verification_method',
+                'type'       => 'radio',
+                'title'      => '链接验证方式（旧版遗留）',
+                'options'    => [
+                    'random_string'  => '随机字符串 + 过期机制（旧）',
+                    'aes_encryption' => 'AES加密 + 后端验证（旧）',
+                ],
+                'default'    => 'random_string',
+                'desc'       => '此项仅用于识别升级前的历史配置，不再影响新链接的签发方式。',
+                'dependency' => ['dmy_link_legacy_token', '==', 'true'],
+            ],
+            [
+                'id'         => 'dmy_link_aes_key',
+                'type'       => 'text',
+                'title'      => 'AES 密钥（旧版遗留）',
+                'desc'       => '仅用于解析升级前用 AES 模式生成的历史链接，请勿再修改。'
+                              . '关闭上方「兼容旧链接」后本项失效。',
+                'default'    => '',
+                'dependency' => ['dmy_link_legacy_token', '==', 'true'],
             ],
             [
                 'id'      => 'dmy_link_referer_protect',
                 'type'    => 'switcher',
                 'title'   => '启用 Referer 防护',
-                'desc'    => '开启后，禁止非本站 Referer 直接访问跳转页（例如 /dinterception 或自定义）',
+                'desc'    => '开启后，禁止非本站 Referer 直接访问跳转页（例如 /dinterception 或自定义）。<br/>'
+                           . 'Referer 可被伪造，它只能挡住顺手滥用，不能替代令牌有效期；建议与较短的有效期配合使用。',
                 'default' => false,
             ],
             [

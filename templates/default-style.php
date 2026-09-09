@@ -3,7 +3,7 @@
     <div class="dmylink-default-box">
         <!-- logo -->
         <div class="dmylink-default-logo">
-            <img src="<?php echo $logourl; ?>" alt="<?php echo get_bloginfo('name'); ?>logo">
+            <img src="<?php echo esc_url($logourl); ?>" alt="<?php echo esc_html(get_bloginfo('name')); ?>logo">
         </div>
         <!-- 内容 -->
         <div class="dmylink-default-title">
@@ -11,13 +11,13 @@
                 <div class="dmylink-default-title-icon">
                     <img class="loading-img"
                         src="<?php echo DMY_LINK_URL . 'assets/img/dmylink-default.png'; ?>"
-                        alt="<?php echo get_bloginfo('name'); ?>-提示警告">
+                        alt="<?php echo esc_html(get_bloginfo('name')); ?>-提示警告">
                     <div class="dmylink-default-title-text">请注意您的账号和财产安全</div>
                 </div>
                 <div class="dmylink-default-titlelink">
                     <span>
                         您即将离开
-                        <?php echo get_bloginfo('name'); ?>，去往:
+                        <?php echo esc_html(get_bloginfo('name')); ?>，去往:
                         <?php echo esc_url($link); ?> 请注意您的帐号和财产安全
                     </span>
                 </div>

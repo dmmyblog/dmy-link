@@ -3,17 +3,17 @@
     <div class="dmylink-zhihu-box">
         <!-- logo -->
         <div class="dmylink-zhihu-logo">
-            <img src="<?php echo $logourl; ?>" alt="<?php echo get_bloginfo('name'); ?>logo">
+            <img src="<?php echo esc_url($logourl); ?>" alt="<?php echo esc_html(get_bloginfo('name')); ?>logo">
         </div>
         <!-- 内容 -->
         <div class="dmylink-zhihu-title">
             <div class="dmylink-zhihu-title-div">
                 <div class="dmylink-zhihu-title-icon">
                     <div class="dmylink-zhihu-title-text">即将离开
-                        <?php echo get_bloginfo('name'); ?>
+                        <?php echo esc_html(get_bloginfo('name')); ?>
                     </div>
                     <p>您即将离开
-                        <?php echo get_bloginfo('name'); ?>，请注意您的帐号和财产安全。
+                        <?php echo esc_html(get_bloginfo('name')); ?>，请注意您的帐号和财产安全。
                     </p>
                     <p class="dmylink-zhihu-titlelink-p-no2">
                         <?php echo esc_url($link); ?>

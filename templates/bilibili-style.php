@@ -9,14 +9,14 @@
                     src="<?php echo DMY_LINK_URL . 'assets/img/dmylink-bilibili.png'; ?>" 
                         alt="">
                     <div class="dmylink-bilibili-title-text">即将离开
-                        <?php echo get_bloginfo('name'); ?>，请保护好个人信息
+                        <?php echo esc_html(get_bloginfo('name')); ?>，请保护好个人信息
                     </div>
                 </div>
                 <div class="dmylink-bilibili-title-div">
                     <div class="dmylink-csdn-title-icon">
                         <img class="loading-img"
                             src="<?php echo DMY_LINK_URL . 'assets/img/dmylink-bilibili-link.png'; ?>"
-                            alt="<?php echo get_bloginfo('name'); ?>-提示警告">
+                            alt="<?php echo esc_html(get_bloginfo('name')); ?>-提示警告">
                         <span>
                             <?php echo esc_url($link); ?>
                         </span>

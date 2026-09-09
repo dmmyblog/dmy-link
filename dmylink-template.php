@@ -31,6 +31,11 @@ define('DMYLINK_TEMPLATES', [
     'dmylink-tiktok'   => 'tiktok-style.php'
 ]);
 
+// 风格标识必须落在已知白名单内，避免任意路径拼接
+if (!isset(DMYLINK_TEMPLATES[$style])) {
+    $style = 'dmylink-default';
+}
+
 // 确保样式表加载
 $css_file = plugin_dir_path(__FILE__) . 'css/' . $style . '.css';
 $css_url = plugin_dir_url(__FILE__) . 'css/' . $style . '.css';
