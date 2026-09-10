@@ -52,6 +52,18 @@ if (file_exists($css_file)) {
     wp_enqueue_style('dmylink-template-style', $css_url, array(), filemtime($css_file));
 }
 
+// 广告位 / 倒计时样式：仅在启用时由 header.php 输出
+$ad_css_url    = '';
+$ad_inline_css = '';
+if (function_exists('dmy_link_ad_assets_needed') && dmy_link_ad_assets_needed($settings)) {
+    $ad_css_file = plugin_dir_path(__FILE__) . 'css/dmylink-ad.css';
+    if (file_exists($ad_css_file)) {
+        $ad_css_url = add_query_arg('ver', filemtime($ad_css_file), plugin_dir_url(__FILE__) . 'css/dmylink-ad.css');
+    }
+    // 外观自定义（宽度 / 颜色 / 圆角 / 自定义 CSS）
+    $ad_inline_css = dmy_link_ad_inline_style($settings);
+}
+
 // 安全加载头部模板
 $header_file = plugin_dir_path(__FILE__) . 'templates/header.php';
 if (file_exists($header_file)) {
@@ -60,6 +72,11 @@ if (file_exists($header_file)) {
     // 头部模板缺失的fallback
     get_header();
     echo '<div class="container">';
+}
+
+// 「提示框上方」的广告位（未启用或位置不是顶部时不输出）
+if (function_exists('dmy_link_render_ad_slot') && isset($link)) {
+    dmy_link_render_ad_slot($link, $settings, 'top');
 }
 
 // 确定要加载的模板文件
@@ -84,6 +101,11 @@ if (file_exists($template_path)) {
     echo '<p>'.__('跳转页面加载失败，请稍后再试。', 'dmylink').'</p>';
     echo '<p>'.__('当前样式: ', 'dmylink') . esc_html($style) . '</p>';
     echo '</div>';
+}
+
+// 倒计时条 + 「提示框下方 / 底部悬浮」的广告位 + 脚本（未启用时不输出任何内容）
+if (function_exists('dmy_link_render_ad_slot') && isset($link)) {
+    dmy_link_render_ad_slot($link, $settings, 'after');
 }
 
 // 加载页面底部

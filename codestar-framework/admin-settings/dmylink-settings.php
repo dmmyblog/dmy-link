@@ -49,6 +49,7 @@ function dmy_link_settings() {
     dmy_link_create_style_section($prefix);
     dmy_link_create_community_section($prefix);
     dmy_link_create_logo_section($prefix);
+    dmy_link_create_ad_section($prefix);
     dmy_link_create_security_section($prefix);
     dmy_link_create_about_section($prefix);
     
@@ -257,6 +258,240 @@ function dmy_link_create_logo_section($prefix) {
                 'title' => 'Logo 图片',
                 'desc'  => '上传一个图片作为 logo,如果您不设置，插件并不会自动获取您网站的logo',
                 'default' => '',
+            ],
+        ],
+    ]);
+}
+
+/**
+ * 创建跳转页广告位面板（1.5.0 新增）
+ */
+function dmy_link_create_ad_section($prefix) {
+    $max_countdown = defined('DMY_LINK_AD_MAX_COUNTDOWN') ? DMY_LINK_AD_MAX_COUNTDOWN : 30;
+
+    $preview_url  = function_exists('dmy_link_ad_preview_url') ? dmy_link_ad_preview_url() : '';
+    $preview_note = '保存设置后，可以 ';
+    if ($preview_url !== '') {
+        $preview_note .= '<a href="' . esc_url($preview_url) . '" target="_blank" rel="noopener noreferrer" class="button button-small">预览跳转页</a>'
+                       . ' 查看实际效果（示例目标为 example.com，链接按当前「链接有效期」签发，过期后刷新本页即可重新生成）。';
+    } else {
+        $preview_note .= '在前台任意点击一条外链查看实际效果。';
+    }
+
+    CSF::createSection($prefix, [
+        'title'  => '跳转页广告',
+        'icon'   => 'fa fa-bullhorn',
+        'fields' => [
+            [
+                'type'    => 'subheading',
+                'content' => '跳转页是全站曝光最高的页面之一，这里可以放一个<strong>广告位 / 内容位</strong>：'
+                           . '图片横幅、公众号二维码、赞助信息或第三方广告代码都可以。'
+                           . '不影响原有的提示与「继续访问」按钮。',
+            ],
+            [
+                'type'    => 'notice',
+                'style'   => 'info',
+                'content' => $preview_note,
+            ],
+            [
+                'id'      => 'dmy_link_ad_enable',
+                'type'    => 'switcher',
+                'title'   => '启用跳转页广告位',
+                'label'   => '关闭后跳转页不输出任何广告相关内容',
+                'default' => false,
+            ],
+            [
+                'id'         => 'dmy_link_ad_hide_logged_in',
+                'type'       => 'switcher',
+                'title'      => '仅对未登录访客展示',
+                'desc'       => '开启后，已登录用户（站长自己、会员）在跳转页看不到广告位；倒计时不受影响。',
+                'default'    => false,
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_position',
+                'type'       => 'radio',
+                'title'      => '广告位位置',
+                'options'    => [
+                    'after'  => '提示框下方（跟随内容）',
+                    'top'    => '提示框上方（跟随内容）',
+                    'bottom' => '底部悬浮横幅',
+                ],
+                'default'    => 'after',
+                'inline'     => true,
+                'desc'       => '底部悬浮横幅固定在屏幕底部、自带关闭按钮，不受各套皮肤布局影响。',
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_type',
+                'type'       => 'radio',
+                'title'      => '广告内容类型',
+                'options'    => [
+                    'image' => '图片 + 链接',
+                    'html'  => '自定义 HTML / 广告代码',
+                ],
+                'default'    => 'image',
+                'inline'     => true,
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_image',
+                'type'       => 'upload',
+                'title'      => '广告图片',
+                'desc'       => '建议宽度 900px 左右的横幅图，页面上会等比缩放到广告位宽度。',
+                'default'    => '',
+                'dependency' => ['dmy_link_ad_enable|dmy_link_ad_type', '==|==', 'true|image'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_url',
+                'type'       => 'text',
+                'title'      => '点击跳转链接（可选）',
+                'desc'       => '填写完整的 http(s) 地址；留空则图片不可点击。链接在新窗口打开，并带 <code>rel="nofollow sponsored"</code>。',
+                'default'    => '',
+                'sanitize'   => 'esc_url_raw',
+                'dependency' => ['dmy_link_ad_enable|dmy_link_ad_type', '==|==', 'true|image'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_alt',
+                'type'       => 'text',
+                'title'      => '图片替代文字（可选）',
+                'default'    => '',
+                'dependency' => ['dmy_link_ad_enable|dmy_link_ad_type', '==|==', 'true|image'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_html',
+                'type'       => 'textarea',
+                'title'      => '广告 HTML 代码',
+                'attributes' => ['rows' => 8, 'placeholder' => '<a href="https://example.com" target="_blank"><img src="..." alt=""></a>'],
+                'desc'       => '支持常规 HTML 与 <code>&lt;iframe&gt;</code>。默认会按 WordPress 文章内容规则过滤，'
+                              . '<code>&lt;script&gt;</code> 会被去掉；需要放第三方广告脚本时请打开下方「原样输出」。',
+                'default'    => '',
+                'sanitize'   => 'dmy_link_sanitize_ad_html',
+                'dependency' => ['dmy_link_ad_enable|dmy_link_ad_type', '==|==', 'true|html'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_raw_html',
+                'type'       => 'switcher',
+                'title'      => '原样输出广告代码（不过滤）',
+                'desc'       => '<span style="color:#d63638;">仅在粘贴可信广告联盟（如自有广告系统）的代码时开启。</span>'
+                              . '开启后广告 HTML 会原样输出到跳转页，包含其中的脚本；请勿粘贴来路不明的代码。'
+                              . '没有 <code>unfiltered_html</code> 权限的账号保存时仍会被过滤。',
+                'default'    => false,
+                'dependency' => ['dmy_link_ad_enable|dmy_link_ad_type', '==|==', 'true|html'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_bare',
+                'type'       => 'switcher',
+                'title'      => '透明容器（不加白色卡片）',
+                'desc'       => '广告代码自带完整样式时开启，插件只负责居中摆放，不再套白色圆角卡片。',
+                'default'    => false,
+                'dependency' => ['dmy_link_ad_enable|dmy_link_ad_type', '==|==', 'true|html'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_label',
+                'type'       => 'text',
+                'title'      => '角标文字',
+                'desc'       => '显示在广告位右上角的小标签，例如「广告」「赞助」「推荐」；留空则不显示。',
+                'default'    => '广告',
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
+            ],
+            [
+                'type'    => 'subheading',
+                'content' => '<strong>外观自定义</strong>：以下选项同时作用于广告卡片和倒计时条。留默认值即可使用插件自带样式。',
+            ],
+            [
+                'id'         => 'dmy_link_ad_width',
+                'type'       => 'number',
+                'title'      => '广告位宽度（px）',
+                'desc'       => '默认 450，与各套皮肤的提示框同宽；范围 200～1200。手机端会自动收缩到屏幕的 94%。',
+                'default'    => 450,
+                'min'        => 200,
+                'max'        => 1200,
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_bg',
+                'type'       => 'color',
+                'title'      => '卡片背景色',
+                'desc'       => '支持透明度。默认 rgba(255,255,255,0.92)。',
+                'default'    => 'rgba(255,255,255,0.92)',
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_text_color',
+                'type'       => 'color',
+                'title'      => '文字颜色',
+                'default'    => '#333333',
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_accent_color',
+                'type'       => 'color',
+                'title'      => '强调色',
+                'desc'       => '用于倒计时数字。默认 #fb7299。',
+                'default'    => '#fb7299',
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_radius',
+                'type'       => 'number',
+                'title'      => '圆角（px）',
+                'default'    => 12,
+                'min'        => 0,
+                'max'        => 60,
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_custom_css',
+                'type'       => 'code_editor',
+                'title'      => '自定义 CSS',
+                'settings'   => ['mode' => 'css'],
+                'desc'       => '只在跳转页输出。可用的类名：<code>.dmylink-slot</code>（外层容器）、<code>.dmylink-ad</code>（广告卡片）、'
+                              . '<code>.dmylink-ad__label</code>（角标）、<code>.dmylink-ad__image</code> / <code>.dmylink-ad__html</code>（内容）、'
+                              . '<code>.dmylink-countdown</code>（倒计时条）、<code>.dmylink-countdown__num</code>（秒数）。',
+                'default'    => '',
+                'sanitize'   => 'dmy_link_sanitize_css',
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
+            ],
+            [
+                'type'    => 'subheading',
+                'content' => '<strong>倒计时自动跳转</strong>：倒计时期间访客会停留在跳转页看到广告位。'
+                           . '为了不让「即将离开本站」的安全提示形同虚设，倒计时<strong>随时可被访客中断</strong>'
+                           . '（点击「取消自动跳转」或按任意键），切到后台标签页时也会自动暂停。',
+            ],
+            [
+                'id'      => 'dmy_link_ad_countdown',
+                'type'    => 'number',
+                'title'   => '倒计时秒数',
+                'desc'    => '0 表示关闭，不自动跳转；最大 ' . $max_countdown . ' 秒。倒计时不依赖广告位，单独开启也可以。',
+                'default' => 0,
+                'min'     => 0,
+                'max'     => $max_countdown,
+            ],
+            [
+                'id'         => 'dmy_link_ad_countdown_text',
+                'type'       => 'text',
+                'title'      => '倒计时文案',
+                'desc'       => '用 <code>{seconds}</code> 表示秒数位置。留空使用默认：「{seconds} 秒后自动前往目标网站」。',
+                'default'    => '',
+                'attributes' => ['placeholder' => '{seconds} 秒后自动前往目标网站'],
+                'dependency' => ['dmy_link_ad_countdown', '!=', '0'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_countdown_stop_text',
+                'type'       => 'text',
+                'title'      => '「取消」按钮文字',
+                'default'    => '',
+                'attributes' => ['placeholder' => '取消自动跳转'],
+                'dependency' => ['dmy_link_ad_countdown', '!=', '0'],
+            ],
+            [
+                'id'         => 'dmy_link_ad_countdown_cancelled_text',
+                'type'       => 'text',
+                'title'      => '取消后的提示',
+                'default'    => '',
+                'attributes' => ['placeholder' => '已取消自动跳转，请手动点击「继续访问」'],
+                'dependency' => ['dmy_link_ad_countdown', '!=', '0'],
             ],
         ],
     ]);

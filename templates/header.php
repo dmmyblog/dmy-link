@@ -19,6 +19,12 @@ if (!empty($user_logo)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex,nofollow">
     <link rel='stylesheet' href='<?php echo esc_url($css_url); ?>' type='text/css'/>
+    <?php if (!empty($ad_css_url)) : ?>
+    <link rel='stylesheet' href='<?php echo esc_url($ad_css_url); ?>' type='text/css'/>
+    <?php endif; ?>
+    <?php if (!empty($ad_inline_css)) : ?>
+    <style id="dmylink-ad-custom"><?php echo $ad_inline_css; // 已在 dmy_link_ad_inline_style() 内清洗 ?></style>
+    <?php endif; ?>
     <?php //wp_head(); ?>
 </head>
 <body class="dmy-overall-body">

@@ -47,6 +47,9 @@ define('DMY_LINK_URL', DMY_LINK_PLUGIN_URL);
 require_once DMY_LINK_PLUGIN_DIR . 'src/Update/GitHubReleaseUpdater.php';
 DmyLink_GitHubReleaseUpdater::init(__FILE__, dmy_link_plugin_version());
 
+// 跳转页广告位与倒计时（1.5.0 新增）
+require_once DMY_LINK_PLUGIN_DIR . 'src/ad-slot.php';
+
 // 加载翻译文件（此前缺失，所有 __(..., 'dmylink') 实际不生效）
 function dmy_link_load_textdomain() {
     load_plugin_textdomain('dmylink', false, dirname(plugin_basename(__FILE__)) . '/languages');

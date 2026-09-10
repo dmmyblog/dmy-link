@@ -1,0 +1,198 @@
+/* 跳转页广告位 & 倒计时（1.5.0） */
+
+.dmylink-slot {
+  position: relative;
+  z-index: 9998;
+  width: var(--dmylink-ad-width, 450px);
+  max-width: 94%;
+  margin: 18px auto 0;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+}
+
+.dmylink-slot--floating {
+  margin: 0;
+}
+
+/* 顶部跟随：放在皮肤内容之前 */
+.dmylink-slot--top {
+  margin: 18px auto 0;
+}
+
+/* ---- 倒计时条 ---- */
+.dmylink-countdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  box-sizing: border-box;
+  background: var(--dmylink-ad-bg, rgba(255, 255, 255, 0.92));
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: var(--dmylink-ad-radius, 12px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  color: var(--dmylink-ad-color, #444);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dmylink-countdown__num {
+  color: var(--dmylink-ad-accent, #fb7299);
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 2px;
+}
+
+.dmylink-countdown__stop {
+  flex: none;
+  color: inherit;
+  opacity: 0.75;
+  font-size: 12px;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.dmylink-countdown.is-cancelled {
+  opacity: 0.8;
+}
+
+/* ---- 广告卡片 ---- */
+.dmylink-ad {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 14px;
+  background: var(--dmylink-ad-bg, rgba(255, 255, 255, 0.92));
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: var(--dmylink-ad-radius, 12px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+  color: var(--dmylink-ad-color, #333);
+  font-size: 14px;
+  line-height: 1.6;
+  word-break: break-all;
+  overflow: hidden;
+}
+
+.dmylink-ad__label {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 1;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  color: inherit;
+  opacity: 0.6;
+  font-size: 11px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.dmylink-ad__close {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 16px;
+  line-height: 22px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.dmylink-ad__close:hover {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.dmylink-ad__image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: calc(var(--dmylink-ad-radius, 12px) - 4px);
+}
+
+.dmylink-ad__link {
+  display: block;
+}
+
+/* 文字类内容位：给右上角角标 / 左上角关闭按钮留出位置，避免压住文字 */
+.dmylink-ad--html .dmylink-ad__html {
+  padding-right: 40px;
+}
+
+.dmylink-ad--html.dmylink-ad--fixed .dmylink-ad__html {
+  padding-left: 22px;
+}
+
+.dmylink-ad__html img,
+.dmylink-ad__html iframe,
+.dmylink-ad__html video {
+  max-width: 100%;
+}
+
+.dmylink-ad__html p {
+  margin: 0 0 8px;
+}
+
+.dmylink-ad__html p:last-child {
+  margin-bottom: 0;
+}
+
+/* 透明容器：第三方广告代码自带样式时，去掉白色卡片 */
+.dmylink-ad--bare {
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.dmylink-ad--bare .dmylink-ad__html {
+  padding: 0;
+}
+
+.dmylink-ad--bare .dmylink-ad__label {
+  top: 0;
+  right: 0;
+}
+
+/* ---- 底部悬浮横幅 ---- */
+.dmylink-ad--fixed {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: 640px;
+  margin: 0;
+  z-index: 9999;
+}
+
+.dmylink-ad--bottom {
+  bottom: 16px;
+}
+
+@media (max-width: 768px) {
+  .dmylink-slot {
+    width: 94%;
+  }
+
+  .dmylink-countdown {
+    flex-wrap: wrap;
+  }
+
+  .dmylink-ad--fixed {
+    width: calc(100% - 20px);
+  }
+
+  .dmylink-ad--bottom {
+    bottom: 10px;
+  }
+}
