@@ -68,10 +68,11 @@ function dmy_link_create_basic_section($prefix) {
         $go_link_nonce_s = _pz('go_link_nonce_s');
         $needs_fix = !empty($go_link_s) || !empty($go_link_nonce_s);
 
-        $notice_type = $needs_fix ? 'warning' : 'info';
+        // 使用框架自带的 submessage 提示框，样式由 style 决定，不再手写内联颜色
+        $notice_type = $needs_fix ? 'danger' : 'success';
         $notice_content = '<strong>检测到子比主题环境</strong><br>';
         if ($needs_fix) {
-            $notice_content .= '<span style="color:#d63638;">子比主题的「外链重定向」或「外链重定向鉴权」已开启，会与插件冲突导致外链无法正确跳转。插件已在运行时自动接管，但建议前往 <a href="' . esc_url(admin_url('admin.php?page=zibll_options#外链重定向')) . '">子比主题设置</a> 关闭以下选项：</span>';
+            $notice_content .= '子比主题的「外链重定向」或「外链重定向鉴权」已开启，会与插件冲突导致外链无法正确跳转。插件已在运行时自动接管，但建议前往 <a href="' . esc_url(admin_url('admin.php?page=zibll_options#外链重定向')) . '">子比主题设置</a> 关闭以下选项：';
             if (!empty($go_link_s)) {
                 $notice_content .= '<br>• <strong>外链重定向</strong>（go_link_s）— 当前：开启 → 建议关闭';
             }
@@ -79,11 +80,11 @@ function dmy_link_create_basic_section($prefix) {
                 $notice_content .= '<br>• <strong>外链重定向鉴权</strong>（go_link_nonce_s）— 当前：开启 → 建议关闭';
             }
         } else {
-            $notice_content .= '<span style="color:#0073aa;">子比主题的「外链重定向」和「外链重定向鉴权」均已关闭，插件可正常工作。</span>';
+            $notice_content .= '子比主题的「外链重定向」和「外链重定向鉴权」均已关闭，插件可正常工作。';
         }
 
         $fields[] = [
-            'type'    => 'notice',
+            'type'    => 'submessage',
             'style'   => $notice_type,
             'content' => $notice_content,
         ];
@@ -283,7 +284,8 @@ function dmy_link_create_ad_section($prefix) {
         'icon'   => 'fa fa-bullhorn',
         'fields' => [
             [
-                'type'    => 'subheading',
+                'type'    => 'notice',
+                'style'   => 'info',
                 'content' => '跳转页是全站曝光最高的页面之一，这里可以放一个<strong>广告位 / 内容位</strong>：'
                            . '图片横幅、公众号二维码、赞助信息或第三方广告代码都可以。'
                            . '不影响原有的提示与「继续访问」按钮。',
@@ -373,11 +375,17 @@ function dmy_link_create_ad_section($prefix) {
                 'id'         => 'dmy_link_ad_raw_html',
                 'type'       => 'switcher',
                 'title'      => '原样输出广告代码（不过滤）',
-                'desc'       => '<span style="color:#d63638;">仅在粘贴可信广告联盟（如自有广告系统）的代码时开启。</span>'
-                              . '开启后广告 HTML 会原样输出到跳转页，包含其中的脚本；请勿粘贴来路不明的代码。'
+                'desc'       => '开启后广告 HTML 会原样输出到跳转页，包含其中的脚本。'
                               . '没有 <code>unfiltered_html</code> 权限的账号保存时仍会被过滤。',
                 'default'    => false,
                 'dependency' => ['dmy_link_ad_enable|dmy_link_ad_type', '==|==', 'true|html'],
+            ],
+            [
+                'type'       => 'submessage',
+                'style'      => 'danger',
+                'content'    => '<strong>安全提醒：</strong>仅在粘贴可信广告联盟（如自有广告系统）的代码时开启「原样输出」。'
+                              . '脚本会不经过滤直接在跳转页执行，请勿粘贴来路不明的代码。',
+                'dependency' => ['dmy_link_ad_enable|dmy_link_ad_type|dmy_link_ad_raw_html', '==|==|==', 'true|html|true'],
             ],
             [
                 'id'         => 'dmy_link_ad_bare',
@@ -397,7 +405,12 @@ function dmy_link_create_ad_section($prefix) {
             ],
             [
                 'type'    => 'subheading',
-                'content' => '<strong>外观自定义</strong>：以下选项同时作用于广告卡片和倒计时条。留默认值即可使用插件自带样式。',
+                'content' => '外观自定义',
+            ],
+            [
+                'type'    => 'notice',
+                'style'   => 'info',
+                'content' => '以下选项同时作用于广告卡片和倒计时条。留默认值即可使用插件自带样式。',
             ],
             [
                 'id'         => 'dmy_link_ad_width',
@@ -455,7 +468,12 @@ function dmy_link_create_ad_section($prefix) {
             ],
             [
                 'type'    => 'subheading',
-                'content' => '<strong>倒计时自动跳转</strong>：倒计时期间访客会停留在跳转页看到广告位。'
+                'content' => '倒计时自动跳转',
+            ],
+            [
+                'type'    => 'notice',
+                'style'   => 'info',
+                'content' => '倒计时期间访客会停留在跳转页看到广告位。'
                            . '为了不让「即将离开本站」的安全提示形同虚设，倒计时<strong>随时可被访客中断</strong>'
                            . '（点击「取消自动跳转」或按任意键），切到后台标签页时也会自动暂停。',
             ],
@@ -506,10 +524,20 @@ function dmy_link_create_security_section($prefix) {
         'icon'   => 'fa fa-lock',
         'fields' => [
             [
-                'type'    => 'subheading',
-                'content' => '<strong>1.5.0 起统一使用 HMAC-SHA256 签名令牌</strong>：跳转令牌不再写入数据库，'
-                           . '与 CDN / Nginx 整页缓存天然兼容；令牌内置有效期，硬上限 24 小时，'
-                           . '旧版「AES 加密 + 永不过期」模式已停止签发。',
+                'type'    => 'notice',
+                'style'   => 'info',
+                'content' => '<strong>1.5.0 起统一使用 HMAC-SHA256 签名令牌，旧的两种验证方式已停止签发。</strong><br/>'
+                           . '<strong>为什么取消「随机字符串 + 过期机制」：</strong>它要把每条外链的令牌写进数据库（transient）才能校验。'
+                           . '页面每渲染一次、每条外链都写一次库，爬虫扫一遍站点就能让 wp_options 膨胀出数万行；'
+                           . '而且一旦开了 CDN / Nginx 整页缓存，缓存 HTML 里的令牌 5 分钟后集体过期，之后所有点击都是「Token 过期」。<br/>'
+                           . '<strong>为什么取消「AES 加密 + 永不过期」：</strong>生成跳转链接的接口必须对未登录访客开放，任何人都能调用它铸造链接。'
+                           . '永不过期意味着攻击者可以批量生成一批挂着本站域名、永久有效的钓鱼跳转链投放到站外，借用本站的域名信誉。'
+                           . '此外旧实现使用固定 IV、没有完整性校验（MAC），同一网址密文恒定、密文可被篡改探测；'
+                           . '密钥默认值又是每次打开设置页随机生成，一旦被改动，全部「永久」链接会立刻失效。<br/>'
+                           . '<strong>为什么改用 HMAC 签名：</strong>跳转场景需要的是「防篡改」而不是「保密」（目标网址本来就会显示给访客）。'
+                           . 'HMAC 签名把「过期时间 + 目标网址」和签名一起放进令牌，服务端只需用密钥重新计算签名即可校验，'
+                           . '不写数据库、与整页缓存天然兼容；令牌自带有效期，硬上限 24 小时，被铸造出去的链接活不过有效期，无法成为长期钓鱼基础设施。'
+                           . '同一网址在 10 分钟时间片内生成相同令牌，不影响 CDN 缓存命中。',
             ],
             [
                 'id'        => 'dmy_link_expiration',
@@ -525,10 +553,16 @@ function dmy_link_create_security_section($prefix) {
                 'id'      => 'dmy_link_legacy_token',
                 'type'    => 'switcher',
                 'title'   => '兼容 1.4.x 及更早的旧链接',
-                'desc'    => '开启后仍可解析升级前签发的旧令牌（随机串 / AES 密文）。<br/>'
-                           . '<strong>注意：旧的 AES 令牌永不过期</strong>，站点缓存刷新完毕后建议关闭此项，'
-                           . '关闭后所有历史旧链接立即失效。',
+                'desc'    => '开启后仍可解析升级前签发的旧令牌（随机串 / AES 密文）。',
                 'default' => true,
+            ],
+            [
+                'type'       => 'submessage',
+                'style'      => 'warning',
+                'content'    => '<strong>注意：旧的 AES 令牌永不过期，此开关开着一天，升级前被任何人铸造出来的永久链接就仍然可用。</strong>'
+                              . '它只是为了让升级后缓存里的旧页面外链不立刻失效而设的过渡措施。'
+                              . '站点整页缓存刷新完毕、确认页面外链正常后，请关闭此项；关闭后所有历史旧链接立即失效。',
+                'dependency' => ['dmy_link_legacy_token', '==', 'true'],
             ],
             [
                 'id'      => 'dmy_link_userinfo_guard',
