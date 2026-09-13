@@ -216,6 +216,9 @@ function dmy_link_get_ad_countdown($settings = null) {
     if ($settings === null) {
         $settings = get_option('dmy_link_settings');
     }
+    if (!is_array($settings) || empty($settings['dmy_link_ad_enable'])) {
+        return 0;
+    }
     $seconds = isset($settings['dmy_link_ad_countdown']) ? (int) $settings['dmy_link_ad_countdown'] : 0;
     if ($seconds < 0) {
         $seconds = 0;

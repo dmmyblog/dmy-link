@@ -1,13 +1,17 @@
 <?php
 $settings = get_option('dmy_link_settings');
 $user_logo = isset($settings['dmy_link_logo']) ? $settings['dmy_link_logo'] : '';
+$custom_logo_id = get_theme_mod('custom_logo');
+$wp_logo = $custom_logo_id ? wp_get_attachment_image_url($custom_logo_id, 'full') : '';
 
 if (!empty($user_logo)) {
     // 用户上传的logo优先级最高
     $logourl = esc_url($user_logo);
 } elseif (is_zibll_themes()) {
-    // 如果没有用户logo且是子比主题，使用子比主题logo
-    $logourl = esc_url(_pz('logo_src'));
+    $theme_logo = function_exists('_pz') ? _pz('logo_src') : '';
+    $logourl = esc_url($theme_logo ? $theme_logo : $wp_logo);
+} elseif (!empty($wp_logo)) {
+    $logourl = esc_url($wp_logo);
 } else {
     $logourl = esc_url(plugins_url('/assets/img/hint.png', dirname(__FILE__)));
 }

@@ -61,32 +61,11 @@ function dmy_link_settings() {
  */
 function dmy_link_create_basic_section($prefix) {
     $fields = [];
-
-    // 子比主题环境下显示冲突提示
     if (is_zibll_themes()) {
-        $go_link_s = _pz('go_link_s');
-        $go_link_nonce_s = _pz('go_link_nonce_s');
-        $needs_fix = !empty($go_link_s) || !empty($go_link_nonce_s);
-
-        // 使用框架自带的 submessage 提示框，样式由 style 决定，不再手写内联颜色
-        $notice_type = $needs_fix ? 'danger' : 'success';
-        $notice_content = '<strong>检测到子比主题环境</strong><br>';
-        if ($needs_fix) {
-            $notice_content .= '子比主题的「外链重定向」或「外链重定向鉴权」已开启，会与插件冲突导致外链无法正确跳转。插件已在运行时自动接管，但建议前往 <a href="' . esc_url(admin_url('admin.php?page=zibll_options#外链重定向')) . '">子比主题设置</a> 关闭以下选项：';
-            if (!empty($go_link_s)) {
-                $notice_content .= '<br>• <strong>外链重定向</strong>（go_link_s）— 当前：开启 → 建议关闭';
-            }
-            if (!empty($go_link_nonce_s)) {
-                $notice_content .= '<br>• <strong>外链重定向鉴权</strong>（go_link_nonce_s）— 当前：开启 → 建议关闭';
-            }
-        } else {
-            $notice_content .= '子比主题的「外链重定向」和「外链重定向鉴权」均已关闭，插件可正常工作。';
-        }
-
         $fields[] = [
             'type'    => 'submessage',
-            'style'   => $notice_type,
-            'content' => $notice_content,
+            'style'   => 'warning',
+            'content' => '<strong>子比主题提示：</strong>请确认子比主题的「外链重定向」及「外链重定向鉴权」已开启，插件会接管主题生成的 golink 地址并输出插件跳转地址。',
         ];
     }
 
@@ -117,6 +96,9 @@ function dmy_link_create_basic_section($prefix) {
  * 创建白名单设置面板
  */
 function dmy_link_create_whitelist_section($prefix) {
+    if (is_zibll_themes()) {
+        return;
+    }
     CSF::createSection($prefix, [
         'title'  => '白名单设置',
         'icon'   => 'fa fa-id-card-o',
@@ -257,7 +239,7 @@ function dmy_link_create_logo_section($prefix) {
                 'id'    => 'dmy_link_logo',
                 'type'  => 'upload',
                 'title' => 'Logo 图片',
-                'desc'  => '上传一个图片作为 logo,如果您不设置，插件并不会自动获取您网站的logo',
+                'desc'  => '上传一个图片作为 logo；留空时优先使用子比主题 Logo，没有主题 Logo 时自动使用 WordPress「自定义 Logo」设置。',
                 'default' => '',
             ],
         ],
@@ -291,16 +273,17 @@ function dmy_link_create_ad_section($prefix) {
                            . '不影响原有的提示与「继续访问」按钮。',
             ],
             [
-                'type'    => 'notice',
-                'style'   => 'info',
-                'content' => $preview_note,
-            ],
-            [
                 'id'      => 'dmy_link_ad_enable',
                 'type'    => 'switcher',
                 'title'   => '启用跳转页广告位',
                 'label'   => '关闭后跳转页不输出任何广告相关内容',
                 'default' => false,
+            ],
+            [
+                'type'    => 'notice',
+                'style'   => 'info',
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
+                'content' => $preview_note,
             ],
             [
                 'id'         => 'dmy_link_ad_hide_logged_in',
@@ -406,11 +389,13 @@ function dmy_link_create_ad_section($prefix) {
             [
                 'type'    => 'subheading',
                 'content' => '外观自定义',
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
             ],
             [
                 'type'    => 'notice',
                 'style'   => 'info',
                 'content' => '以下选项同时作用于广告卡片和倒计时条。留默认值即可使用插件自带样式。',
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
             ],
             [
                 'id'         => 'dmy_link_ad_width',
@@ -469,6 +454,7 @@ function dmy_link_create_ad_section($prefix) {
             [
                 'type'    => 'subheading',
                 'content' => '倒计时自动跳转',
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
             ],
             [
                 'type'    => 'notice',
@@ -476,6 +462,7 @@ function dmy_link_create_ad_section($prefix) {
                 'content' => '倒计时期间访客会停留在跳转页看到广告位。'
                            . '为了不让「即将离开本站」的安全提示形同虚设，倒计时<strong>随时可被访客中断</strong>'
                            . '（点击「取消自动跳转」或按任意键），切到后台标签页时也会自动暂停。',
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
             ],
             [
                 'id'      => 'dmy_link_ad_countdown',
@@ -485,6 +472,7 @@ function dmy_link_create_ad_section($prefix) {
                 'default' => 0,
                 'min'     => 0,
                 'max'     => $max_countdown,
+                'dependency' => ['dmy_link_ad_enable', '==', 'true'],
             ],
             [
                 'id'         => 'dmy_link_ad_countdown_text',
